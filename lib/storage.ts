@@ -10,9 +10,15 @@ export const storageKeys = Object.freeze({
   privateWarnDismiss: 'apollo_docs_private_warn_dismissed_v1'
 });
 
-// v3+ content storage (TipTap JSON).
+// v2+ content storage (TipTap JSON).
+// NOTE: Earlier builds used a Quill Delta key. This project no longer reads/writes that legacy format.
 export function getContentKeyV2(id: string): string {
   return `apollo_docs_doc_${id}_content_v2`;
+}
+
+// Backward-compatible alias used throughout the codebase.
+export function getContentKey(id: string): string {
+  return getContentKeyV2(id);
 }
 
 function isBrowser(): boolean {

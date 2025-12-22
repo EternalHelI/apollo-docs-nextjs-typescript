@@ -17,38 +17,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
-  version: 'v3.1.0',
+  version: 'v3.1.1',
   date: '2025-12-22',
-  time: '12:54 AM PST',
-  title: 'UI polish + toast fix + legacy cleanup',
-  summary: 'Improved the editor UI density and page-break visuals, fixed toast animations, seeded new documents with an intro, and removed the deprecated Quill Delta compatibility layer.',
+  time: '2:40 PM PST',
+  title: 'Editor header compaction + autosave status fix',
+  summary: 'Made the editor top bar more compact, fixed the save status getting stuck, and strengthened favicon/legacy-storage handling.',
   sections: [
     {
-      title: 'Editor UX',
+      title: 'Editor UI',
       items: [
-        'Made the document bar more compact for naming/status and tightened spacing.',
-        'Improved on-screen page break guides with a small gap band + divider (Google Docs style).',
-        'Seeded every newly created document with an introductory message.',
-        'Fixed the status indicator to reliably exit “Loading…” once the editor hydrates.'
+        'Reworked the editor header into a compact 3-zone layout (document name + status | document settings toolbar | actions).',
+        'Moved the TipTap toolbar into the sticky header so document settings are directly connected to the document name and actions.',
+        'Made page break guides more visible with a thicker, subtle band near the bottom of each Letter page.'
       ]
     },
     {
-      title: 'Reliability',
+      title: 'Save status',
       items: [
-        'Fixed toast show/hide animations by aligning JS class toggles with the CSS (restores notifications on Home + Archive).'
+        'Implemented an autosave status flow with animated dots while typing (Autosaving., Autosaving.., Autosaving...).',
+        'When a save completes, the status now shows an exact timestamp (Saved @ HH:MM AM/PM).',
+        'Added clear red error states for failed saves (e.g., “Couldn't save”).'
       ]
     },
     {
-      title: 'Storage',
+      title: 'Assets & storage cleanup',
       items: [
-        'Removed legacy Quill Delta support and migration code; TipTap JSON storage is now the only supported format.'
-      ]
-    },
-    {
-      title: 'Assets',
-      items: [
-        'Updated the document/info SVG assets to the fixed-color versions.',
-        'Set the rocket icon as the site favicon via app/icon.svg.'
+        'Added app/icon.svg and public/favicon.svg and updated metadata icons so the rocket favicon resolves reliably.',
+        'Removed all Quill Delta snapshot storage/migration paths from the editor and archive/trash storage.'
       ]
     }
   ]

@@ -5,7 +5,14 @@ import '@/app/globals.css';
 export const metadata: Metadata = {
   title: 'Apollo Hub • Apollo Documents',
   description: 'Apollo Documents — manage your documents locally in your browser and open the editor when needed.',
-  icons: { icon: '/assets/gear-16.png' },
+  // Favicon (rocket). Next.js will emit the corresponding <link rel="icon"> tags.
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' }
+    ],
+    shortcut: ['/icon.svg']
+  },
   other: { 'color-scheme': 'dark light' }
 };
 

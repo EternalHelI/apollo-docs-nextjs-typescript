@@ -16,7 +16,7 @@ export interface TrashItem {
   updatedAt: number;
   deletedAt: number;
   /** v3+ editor content snapshot (TipTap JSON string). */
-  contentV2: string | null;
+  contentV2?: string | null;
 }
 
 export interface ChangelogSection {

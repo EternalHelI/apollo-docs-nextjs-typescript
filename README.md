@@ -69,8 +69,8 @@ All content is stored in the browser.
 
 - Document index: `apollo_docs_index_v1`
 - Trash/Archive: `apollo_docs_trash_v1`
-- Per-document content (legacy v1/v2): `apollo_docs_doc_<docId>_delta` (Quill Delta JSON as a raw string)
 - Per-document content (v3+): `apollo_docs_doc_<docId>_content_v2` (TipTap JSON as a raw string)
+- Legacy Quill Delta keys may exist in older browsers, but are ignored by this build.
 - Preferences:
   - Theme: `apollo_docs_theme_v1`
   - Docs view: `apollo_docs_view_v1`

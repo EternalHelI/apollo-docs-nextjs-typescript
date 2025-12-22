@@ -24,10 +24,18 @@ import { useToast } from '@/lib/hooks/useToast';
 import type { DocMeta } from '@/lib/types';
 import { createDoc, ensureDocMeta, setDocTitle, touchDoc } from '@/lib/docsStore';
 import { loadContentV2Raw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
-import { downloadBlob, escapeHtml, fmtTime, safeFilename } from '@/lib/utils';
+import { downloadBlob, escapeHtml, safeFilename } from '@/lib/utils';
 import { loadScriptOnce } from '@/lib/externalScripts';
 
 type StatusTone = 'neutral' | 'ok' | 'warn' | 'err';
+type StatusMode = 'loading' | 'ready' | 'autosaving' | 'saving' | 'working' | 'saved' | 'message' | 'error';
+
+interface StatusState {
+  mode: StatusMode;
+  tone: StatusTone;
+  base: string;
+  at?: number;
+}
 
 function statusClass(tone: StatusTone): string {
   switch (tone) {
@@ -36,6 +44,22 @@ function statusClass(tone: StatusTone): string {
     case 'err': return 'status status--err';
     default: return 'status';
   }
+}
+
+function fmtClock(ms: number): string {
+  try {
+    return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function textToBasicHtml(text: string): string {
+  const clean = (text || '').replace(/\r\n?/g, '\n').trim();
+  if (!clean) return '<p></p>';
+  const paras = clean.split(/\n{2,}/g).map(p => p.trim()).filter(Boolean);
+  const toP = (p: string) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`;
+  return paras.map(toP).join('');
 }
 
 export default function EditorClient(props: { initialId?: string }) {
@@ -50,12 +74,12 @@ export default function EditorClient(props: { initialId?: string }) {
   const toast = useToast();
 
   const autosaveTimerRef = useRef<number | null>(null);
-  const statusTimerRef = useRef<number | null>(null);
   const hydratedForDocRef = useRef<string | null>(null);
 
   const [doc, setDoc] = useState<DocMeta | null>(null);
   const [title, setTitle] = useState('Apollo Document');
-  const [status, setStatus] = useState<{ tone: StatusTone; text: string }>({ tone: 'neutral', text: 'Loading…' });
+  const [status, setStatus] = useState<StatusState>({ mode: 'loading', tone: 'neutral', base: 'Loading' });
+  const [dots, setDots] = useState(0);
   const [wordCountEnabled, setWordCountEnabled] = useState(false);
   const [wordCount, setWordCount] = useState(0);
 
@@ -75,13 +99,49 @@ export default function EditorClient(props: { initialId?: string }) {
     content: '<p></p>'
   });
 
-  // Resolve docId: ensure metadata exists.
+  // Dots animation for working/saving states.
+  useEffect(() => {
+    const needsDots = status.mode === 'loading' || status.mode === 'autosaving' || status.mode === 'saving' || status.mode === 'working';
+    if (!needsDots) {
+      setDots(0);
+      return;
+    }
+
+    setDots(1);
+    const id = window.setInterval(() => {
+      setDots((d) => (d >= 3 ? 1 : d + 1));
+    }, 320);
+
+    return () => window.clearInterval(id);
+  }, [status.mode, status.base]);
+
+  const statusText = useMemo(() => {
+    if (status.mode === 'saved') return `Saved @ ${fmtClock(status.at ?? Date.now())}`;
+    if (status.mode === 'ready') return 'Ready.';
+    if (status.mode === 'message' || status.mode === 'error') return status.base;
+    return `${status.base}${dots ? '.'.repeat(dots) : ''}`;
+  }, [dots, status]);
+
+  const setReady = useCallback(() => setStatus({ mode: 'ready', tone: 'neutral', base: 'Ready' }), []);
+  const setWorking = useCallback((base: string, tone: StatusTone = 'neutral') => setStatus({ mode: 'working', tone, base }), []);
+  const setAutosaving = useCallback(() => {
+    setStatus((s) => {
+      if (s.mode === 'loading' || s.mode === 'working' || s.mode === 'saving') return s;
+      if (s.mode === 'autosaving') return s;
+      return { mode: 'autosaving', tone: 'neutral', base: 'Autosaving' };
+    });
+  }, []);
+  const setSaving = useCallback(() => setStatus({ mode: 'saving', tone: 'neutral', base: 'Saving' }), []);
+  const setSaved = useCallback((at = Date.now()) => setStatus({ mode: 'saved', tone: 'ok', base: 'Saved', at }), []);
+  const setMessage = useCallback((base: string, tone: StatusTone = 'neutral') => setStatus({ mode: 'message', tone, base }), []);
+  const setError = useCallback((base: string) => setStatus({ mode: 'error', tone: 'err', base }), []);
+
+  // Resolve doc meta.
   useEffect(() => {
     if (!requestedId) return;
     const meta = ensureDocMeta(requestedId);
     setDoc(meta);
     setTitle(meta.title || 'Apollo Document');
-    setStatus({ tone: 'neutral', text: 'Loading…' });
   }, [requestedId]);
 
   // If no id was provided, create a new doc and push.
@@ -89,10 +149,6 @@ export default function EditorClient(props: { initialId?: string }) {
     if (requestedId) return;
     try {
       const meta = createDoc('Apollo Document');
-      // Keep the editor usable even if the route doesn't remount immediately.
-      setDoc(meta);
-      setTitle(meta.title || 'Apollo Document');
-      setStatus({ tone: 'neutral', text: 'Loading…' });
       router.replace(`/editor?id=${encodeURIComponent(meta.id)}`);
     } catch {
       router.replace('/homepage');
@@ -103,19 +159,6 @@ export default function EditorClient(props: { initialId?: string }) {
   useEffect(() => {
     setWordCountEnabled(loadWordCountEnabled());
   }, []);
-
-  const scheduleStatusReset = useCallback(() => {
-    if (statusTimerRef.current) window.clearTimeout(statusTimerRef.current);
-    statusTimerRef.current = window.setTimeout(() => {
-      setStatus({ tone: 'neutral', text: 'Ready.' });
-      statusTimerRef.current = null;
-    }, 1200);
-  }, []);
-
-  const setStatusNow = useCallback((text: string, tone: StatusTone = 'neutral') => {
-    setStatus({ text, tone });
-    if (tone === 'ok') scheduleStatusReset();
-  }, [scheduleStatusReset]);
 
   const computeWordCount = useCallback(() => {
     if (!editor) return;
@@ -129,66 +172,78 @@ export default function EditorClient(props: { initialId?: string }) {
     }
   }, [editor]);
 
-  const persist = useCallback((mode: 'auto' | 'manual' = 'auto') => {
+  const persistAuto = useCallback(() => {
     if (!doc || !editor) return;
     try {
-      setStatusNow(mode === 'manual' ? 'Saving…' : 'Autosaving…', 'neutral');
       const json = editor.getJSON();
       saveContentV2Raw(doc.id, JSON.stringify(json));
       try { touchDoc(doc.id); } catch {}
-      setStatusNow('Saved.', 'ok');
+      setSaved(Date.now());
     } catch {
-      setStatusNow('Save failed.', 'err');
+      setError("Couldn't autosave");
     }
-  }, [doc, editor, setStatusNow]);
+  }, [doc, editor, setError, setSaved]);
+
+  const persistManual = useCallback(() => {
+    if (!doc || !editor) return;
+    try {
+      setSaving();
+      const json = editor.getJSON();
+      saveContentV2Raw(doc.id, JSON.stringify(json));
+      try { touchDoc(doc.id); } catch {}
+      setSaved(Date.now());
+    } catch {
+      setError("Couldn't save");
+    }
+  }, [doc, editor, setError, setSaved, setSaving]);
 
   const scheduleAutosave = useCallback(() => {
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = window.setTimeout(() => {
       autosaveTimerRef.current = null;
-      persist('auto');
-    }, 450);
-  }, [persist]);
+      persistAuto();
+    }, 850);
+  }, [persistAuto]);
 
   // Load content for this doc.
   useEffect(() => {
     if (!doc || !editor) return;
     if (hydratedForDocRef.current === doc.id) return;
     hydratedForDocRef.current = doc.id;
-    try {
-      setStatusNow('Loading…', 'neutral');
 
-      const rawV2 = loadContentV2Raw(doc.id);
-      if (rawV2) {
-        try {
+    const run = () => {
+      try {
+        setWorking('Loading');
+
+        const rawV2 = loadContentV2Raw(doc.id);
+        if (rawV2) {
           editor.commands.setContent(JSON.parse(rawV2));
-        } catch {
-          // Corrupted payload — recover to a blank document so the editor stays usable.
-          editor.commands.setContent('<p></p>');
-          setStatusNow('Recovered from corrupted content.', 'warn');
+        } else {
+          // No snapshot yet: start with an empty paragraph.
+          editor.commands.setContent(textToBasicHtml(''), false);
         }
-      } else {
-        // New document (or cleared storage)
-        editor.commands.setContent('<p></p>');
-      }
 
-      computeWordCount();
-      // Ensure we never leave the status stuck on a loading string.
-      if (statusTimerRef.current) window.clearTimeout(statusTimerRef.current);
-      setStatusNow('Ready.', 'neutral');
-    } catch {
-      setStatusNow('Editor failed to load.', 'err');
-    }
-  }, [computeWordCount, doc, editor, setStatusNow]);
+        setReady();
+        computeWordCount();
+      } catch {
+        setError('Editor failed to load');
+      }
+    };
+
+    run();
+  }, [computeWordCount, doc, editor, setError, setReady, setWorking]);
 
   // Autosave on user edits
   useEffect(() => {
     if (!editor) return;
+
     const handler = () => {
       if (wordCountEnabled) {
         const idle = (window as any).requestIdleCallback as ((cb: () => void) => void) | undefined;
         if (typeof idle === 'function') idle(() => computeWordCount()); else computeWordCount();
       }
+
+      setAutosaving();
       scheduleAutosave();
     };
 
@@ -196,7 +251,7 @@ export default function EditorClient(props: { initialId?: string }) {
     return () => {
       try { editor.off('update', handler); } catch {}
     };
-  }, [computeWordCount, editor, scheduleAutosave, wordCountEnabled]);
+  }, [computeWordCount, editor, scheduleAutosave, setAutosaving, wordCountEnabled]);
 
   // Ctrl/Cmd+S manual save
   useEffect(() => {
@@ -204,12 +259,12 @@ export default function EditorClient(props: { initialId?: string }) {
       const k = (e.key || '').toLowerCase();
       if ((e.ctrlKey || e.metaKey) && k === 's') {
         e.preventDefault();
-        persist('manual');
+        persistManual();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [persist]);
+  }, [persistManual]);
 
   // Keep title in sync with doc meta
   const onTitleBlur = useCallback(() => {
@@ -284,11 +339,11 @@ export default function EditorClient(props: { initialId?: string }) {
         text: getEditorText()
       };
       downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), safeFilename(title, 'json'));
-      setStatusNow(`Saved As JSON @ ${fmtTime(Date.now())}`, 'ok');
+      setMessage(`Saved JSON @ ${fmtClock(Date.now())}`, 'ok');
     } catch {
-      setStatusNow('Save As failed.', 'err');
+      setError('Save As failed');
     }
-  }, [doc, editor, getEditorHtml, getEditorText, setStatusNow, title]);
+  }, [doc, editor, getEditorHtml, getEditorText, setError, setMessage, title]);
 
   const getPrintableContainer = useCallback(() => {
     const wrapper = document.createElement('div');
@@ -304,9 +359,10 @@ export default function EditorClient(props: { initialId?: string }) {
 
   const exportPDF = useCallback(async () => {
     try {
-      setStatusNow('Preparing PDF…', 'neutral');
+      setWorking('Preparing PDF');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js', () => (window as any).html2pdf);
-      setStatusNow('Exporting PDF…', 'warn');
+
+      setMessage('Exporting PDF…', 'warn');
       const filename = safeFilename(title, 'pdf');
       await (window as any).html2pdf().set({
         margin: 10,
@@ -316,29 +372,31 @@ export default function EditorClient(props: { initialId?: string }) {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }).from(getPrintableContainer()).save();
 
-      setStatusNow(`PDF exported @ ${fmtTime(Date.now())}`, 'ok');
+      setMessage(`PDF exported @ ${fmtClock(Date.now())}`, 'ok');
     } catch {
-      setStatusNow('PDF export failed.', 'err');
+      setError('PDF export failed');
     }
-  }, [getPrintableContainer, setStatusNow, title]);
+  }, [getPrintableContainer, setError, setMessage, setWorking, title]);
 
   const exportDOCX = useCallback(async () => {
     try {
-      setStatusNow('Preparing DOCX…', 'neutral');
+      setWorking('Preparing DOCX');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js', () => (window as any).htmlDocx);
+
       const htmlBody = getEditorHtml();
       const docHtml = `<!doctype html><html><head><meta charset="utf-8"></head><body>${htmlBody}</body></html>`;
       downloadBlob((window as any).htmlDocx.asBlob(docHtml), safeFilename(title, 'docx'));
-      setStatusNow(`DOCX exported @ ${fmtTime(Date.now())}`, 'ok');
+      setMessage(`DOCX exported @ ${fmtClock(Date.now())}`, 'ok');
     } catch {
-      setStatusNow('DOCX export failed.', 'err');
+      setError('DOCX export failed');
     }
-  }, [getEditorHtml, setStatusNow, title]);
+  }, [getEditorHtml, setError, setMessage, setWorking, title]);
 
   const exportODT = useCallback(async () => {
     try {
-      setStatusNow('Preparing ODT…', 'neutral');
+      setWorking('Preparing ODT');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', () => (window as any).JSZip);
+
       const text = getEditorText();
       const paras = text.split('\n').map(t => t.trim()).filter(Boolean);
       const escapeXml = (s: string) => s
@@ -365,11 +423,11 @@ export default function EditorClient(props: { initialId?: string }) {
 
       const blob = await zip.generateAsync({ type: 'blob' });
       downloadBlob(blob, safeFilename(title, 'odt'));
-      setStatusNow(`ODT exported @ ${fmtTime(Date.now())}`, 'ok');
+      setMessage(`ODT exported @ ${fmtClock(Date.now())}`, 'ok');
     } catch {
-      setStatusNow('ODT export failed.', 'err');
+      setError('ODT export failed');
     }
-  }, [getEditorText, setStatusNow, title]);
+  }, [getEditorText, setError, setMessage, setWorking, title]);
 
   const onPrint = useCallback(async () => {
     try {
@@ -451,8 +509,6 @@ export default function EditorClient(props: { initialId?: string }) {
     }
   }, [getEditorHtml]);
 
-  const statusAria = useMemo(() => status.text, [status.text]);
-
   // Toolbar state
   const headingValue = useMemo(() => {
     if (!editor) return '';
@@ -499,14 +555,60 @@ export default function EditorClient(props: { initialId?: string }) {
 
       <main className="container editor-wrap" id="main">
         <div className="docbar" id="docbar">
-          <div className="docbar-inner">
+          <div className="docbar-inner docbar-inner--editor">
             <div className="docbar-left">
               <label className="sr-only" htmlFor="docTitle">Document Name</label>
-              <input autoComplete="off" id="docTitle" type="text" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={onTitleBlur} />
-              <div aria-live="polite" className={statusClass(status.tone)} id="status" role="status">{statusAria}</div>
+              <input
+                autoComplete="off"
+                id="docTitle"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={onTitleBlur}
+              />
+              <div aria-live="polite" className={statusClass(status.tone)} id="status" role="status">{statusText}</div>
+              <div className="wordcount-pill" hidden={!wordCountEnabled}>Words: {wordCount}</div>
+            </div>
+
+            <div className="docbar-mid" aria-label="Document settings">
+              <div aria-label="Editor toolbar" className="tt-toolbar tt-toolbar--inline" id="toolbar" role="toolbar">
+                <span className="tt-group">
+                  <label className="sr-only" htmlFor="ttHeading">Heading</label>
+                  <select aria-label="Heading" id="ttHeading" value={headingValue} onChange={(e) => setHeading(e.target.value)} disabled={!editor}>
+                    <option value="">Normal</option>
+                    <option value="1">Heading 1</option>
+                    <option value="2">Heading 2</option>
+                    <option value="3">Heading 3</option>
+                  </select>
+                </span>
+
+                <span className="tt-group">
+                  <button type="button" className={`tt-btn${editor?.isActive('bold') ? ' is-active' : ''}`} aria-label="Bold" onClick={() => editor?.chain().focus().toggleBold().run()} disabled={!editor}>B</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('italic') ? ' is-active' : ''}`} aria-label="Italic" onClick={() => editor?.chain().focus().toggleItalic().run()} disabled={!editor}>I</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('underline') ? ' is-active' : ''}`} aria-label="Underline" onClick={() => editor?.chain().focus().toggleUnderline().run()} disabled={!editor}>U</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('strike') ? ' is-active' : ''}`} aria-label="Strikethrough" onClick={() => editor?.chain().focus().toggleStrike().run()} disabled={!editor}>S</button>
+                </span>
+
+                <span className="tt-group">
+                  <button type="button" className={`tt-btn${editor?.isActive('orderedList') ? ' is-active' : ''}`} aria-label="Numbered list" onClick={() => editor?.chain().focus().toggleOrderedList().run()} disabled={!editor}>1.</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('bulletList') ? ' is-active' : ''}`} aria-label="Bullet list" onClick={() => editor?.chain().focus().toggleBulletList().run()} disabled={!editor}>•</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('blockquote') ? ' is-active' : ''}`} aria-label="Blockquote" onClick={() => editor?.chain().focus().toggleBlockquote().run()} disabled={!editor}>❝</button>
+                  <button type="button" className={`tt-btn${editor?.isActive('codeBlock') ? ' is-active' : ''}`} aria-label="Code block" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} disabled={!editor}>⌘</button>
+                </span>
+
+                <span className="tt-group">
+                  <button type="button" className={`tt-btn${editor?.isActive('link') ? ' is-active' : ''}`} aria-label="Insert link" onClick={setOrUnsetLink} disabled={!editor}>Link</button>
+                  <button type="button" className="tt-btn" aria-label="Clear formatting" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()} disabled={!editor}>Clear</button>
+                </span>
+              </div>
             </div>
 
             <nav aria-label="Document actions" className="docbar-actions">
+              <button aria-label="Print" className="btn btn-print" id="btnPrint" title="Print document" type="button" onClick={() => void onPrint()}>
+                <img alt="" aria-hidden="true" className="icon-print-img" height={16} src="/assets/print-svgrepo-com.svg" width={16} />
+                <span className="btn-text">Print</span>
+              </button>
+
               <Link aria-label="Home" className="btn btn-home" href="/homepage" id="btnHome" title="Home">
                 <img alt="" aria-hidden="true" className="icon-home-img" height={16} src="/assets/house-line-svgrepo-com.svg" width={16} />
                 <span className="btn-text">Home</span>
@@ -537,7 +639,7 @@ export default function EditorClient(props: { initialId?: string }) {
                   <div className="menu-sep" />
                   <div className="menu-label">File</div>
 
-                  <button className="menu-item" id="btnSave" type="button" onClick={() => persist('manual')}>
+                  <button className="menu-item" id="btnSave" type="button" onClick={persistManual}>
                     <div className="menu-item-title">Save</div>
                     <div className="menu-item-desc">Manual snapshot (Ctrl/Cmd+S)</div>
                   </button>
@@ -573,53 +675,11 @@ export default function EditorClient(props: { initialId?: string }) {
                   <div className="menu-sep" />
                 </div>
               </div>
-
-              <button aria-label="Print" className="btn btn-print" id="btnPrint" title="Print document" type="button" onClick={() => void onPrint()}>
-                <img alt="" aria-hidden="true" className="icon-print-img" height={16} src="/assets/print-svgrepo-com.svg" width={16} />
-                <span className="btn-text">Print</span>
-              </button>
             </nav>
           </div>
         </div>
 
-        <div className="toolstrip" id="toolstrip">
-          <div className="toolstrip-inner">
-            <div aria-label="Editor toolbar" className="tt-toolbar" id="toolbar" role="toolbar">
-              <span className="tt-group">
-                <label className="sr-only" htmlFor="ttHeading">Heading</label>
-                <select aria-label="Heading" id="ttHeading" value={headingValue} onChange={(e) => setHeading(e.target.value)} disabled={!editor}>
-                  <option value="">Normal</option>
-                  <option value="1">Heading 1</option>
-                  <option value="2">Heading 2</option>
-                  <option value="3">Heading 3</option>
-                </select>
-              </span>
-
-              <span className="tt-group">
-                <button type="button" className={`tt-btn${editor?.isActive('bold') ? ' is-active' : ''}`} aria-label="Bold" onClick={() => editor?.chain().focus().toggleBold().run()} disabled={!editor}>B</button>
-                <button type="button" className={`tt-btn${editor?.isActive('italic') ? ' is-active' : ''}`} aria-label="Italic" onClick={() => editor?.chain().focus().toggleItalic().run()} disabled={!editor}>I</button>
-                <button type="button" className={`tt-btn${editor?.isActive('underline') ? ' is-active' : ''}`} aria-label="Underline" onClick={() => editor?.chain().focus().toggleUnderline().run()} disabled={!editor}>U</button>
-                <button type="button" className={`tt-btn${editor?.isActive('strike') ? ' is-active' : ''}`} aria-label="Strikethrough" onClick={() => editor?.chain().focus().toggleStrike().run()} disabled={!editor}>S</button>
-              </span>
-
-              <span className="tt-group">
-                <button type="button" className={`tt-btn${editor?.isActive('orderedList') ? ' is-active' : ''}`} aria-label="Numbered list" onClick={() => editor?.chain().focus().toggleOrderedList().run()} disabled={!editor}>1.</button>
-                <button type="button" className={`tt-btn${editor?.isActive('bulletList') ? ' is-active' : ''}`} aria-label="Bullet list" onClick={() => editor?.chain().focus().toggleBulletList().run()} disabled={!editor}>•</button>
-                <button type="button" className={`tt-btn${editor?.isActive('blockquote') ? ' is-active' : ''}`} aria-label="Blockquote" onClick={() => editor?.chain().focus().toggleBlockquote().run()} disabled={!editor}>❝</button>
-                <button type="button" className={`tt-btn${editor?.isActive('codeBlock') ? ' is-active' : ''}`} aria-label="Code block" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} disabled={!editor}>⌘</button>
-              </span>
-
-              <span className="tt-group">
-                <button type="button" className={`tt-btn${editor?.isActive('link') ? ' is-active' : ''}`} aria-label="Insert link" onClick={setOrUnsetLink} disabled={!editor}>Link</button>
-                <button type="button" className="tt-btn" aria-label="Clear formatting" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()} disabled={!editor}>Clear</button>
-              </span>
-            </div>
-
-            <div className="wordcount" hidden={!wordCountEnabled} id="wordCount">Words: {wordCount}</div>
-          </div>
-        </div>
-
-        <section className="panel">
+        <section className="panel panel--editor">
           <EditorContent editor={editor} />
         </section>
 

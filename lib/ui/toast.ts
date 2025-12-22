@@ -40,9 +40,10 @@ export function createToast(opts: {
   const hide = () => {
     clearTimers();
     if (!toastEl) return;
-    // Match the CSS animation classes.
+
     toastEl.classList.remove('toast--show');
     toastEl.classList.add('toast--hide');
+
     window.setTimeout(() => {
       toastEl.hidden = true;
       toastEl.classList.remove('toast--hide');
@@ -62,7 +63,10 @@ export function createToast(opts: {
 
     toastEl.hidden = false;
     toastEl.classList.remove('toast--hide');
-    window.requestAnimationFrame(() => toastEl.classList.add('toast--show'));
+
+    window.requestAnimationFrame(() => {
+      toastEl.classList.add('toast--show');
+    });
 
     scheduleTick();
     hideTimeout = window.setTimeout(hide, remaining * 1000);
