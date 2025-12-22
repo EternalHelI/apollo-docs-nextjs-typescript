@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 
 import EditorClient from './EditorClient';
 
+// This app is localStorage-first and client-heavy. Force dynamic rendering to avoid
+// static prerender bailouts during CI builds when search params are involved.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Editor • Apollo Documents'
 };

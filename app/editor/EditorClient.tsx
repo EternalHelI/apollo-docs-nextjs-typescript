@@ -440,7 +440,6 @@ export default function EditorClient(props: { initialId?: string }) {
       `;
 
       const html = `<!doctype html><html><head><meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Print</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
         <style>${printCss}</style>

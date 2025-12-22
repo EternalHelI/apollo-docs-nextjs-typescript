@@ -17,6 +17,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v2.0.4',
+  date: '2025-12-21',
+  time: '10:15 PM PST',
+  title: 'Fix: Vercel prerender bailout hardening + Next 16 pin',
+  summary: 'Hardened the /editor route against static prerender bailouts and aligned dependencies with the intended Next.js version while removing build-time viewport warnings.',
+  sections: [
+    {
+      title: 'Build & Deployment',
+      items: [
+        'Pinned Next.js dependency to 16.1.0 to match the deployment target and avoid unexpected minor upgrades during CI installs.',
+        'Forced the /editor route to render dynamically to prevent static prerender failures related to CSR bailout constraints.',
+        'Removed an unnecessary viewport meta tag from the print iframe template to reduce viewport-related build warnings and keep viewport configuration solely in Next metadata exports.'
+      ]
+    }
+  ]
+},
+{
   version: 'v2.0.3',
   date: '2025-12-21',
   time: '9:58 PM PST',
