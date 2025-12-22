@@ -17,6 +17,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v2.0.2',
+  date: '2025-12-21',
+  time: '9:28 PM PST',
+  title: 'Fix: toast hook API mismatch (Vercel build)',
+  summary: 'Resolved a TypeScript compilation failure caused by inconsistent useToast() return shapes across pages.',
+  sections: [
+    {
+      title: 'Build & UI',
+      items: [
+        'Updated /editor to use the same toast hook contract as /homepage and /archive (toast.refs + toast.show).',
+        'Extended useToast() to expose both direct refs (toastRef/textRef/timerRef) and grouped refs (refs.*) for backwards-compatible call sites.'
+      ]
+    }
+  ]
+},
+{
   version: 'v2.0.1',
   date: '2025-12-21',
   time: '9:30 PM PST',

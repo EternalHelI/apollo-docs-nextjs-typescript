@@ -21,6 +21,11 @@ export function useToast() {
 
   const api = useMemo(() => {
     return {
+      // Expose both a grouped refs object and direct refs for convenience.
+      // This keeps call sites flexible and avoids churn if a page destructures refs.
+      toastRef,
+      textRef,
+      timerRef,
       refs: { toastRef, textRef, timerRef },
       show: (htmlMessage: string, seconds?: number) => controllerRef.current?.show(htmlMessage, seconds),
       hide: () => controllerRef.current?.hide()

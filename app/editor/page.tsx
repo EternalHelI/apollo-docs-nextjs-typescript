@@ -43,7 +43,7 @@ export default function EditorPage() {
   const requestedId = search.get('id');
 
   const { isDark, toggleTheme, toggleLabel: themeLabel } = useThemeMode();
-  const { toastRef, textRef, timerRef, toast } = useToast();
+  const toast = useToast();
 
   const editorElRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<any>(null);
@@ -641,7 +641,7 @@ export default function EditorPage() {
           <div id="editor" ref={editorElRef} tabIndex={-1} />
         </section>
 
-        <ToastHost toastRef={toastRef} textRef={textRef} timerRef={timerRef} variant="danger" />
+        <ToastHost toastRef={toast.refs.toastRef} textRef={toast.refs.textRef} timerRef={toast.refs.timerRef} variant="danger" />
       </main>
 
       <SiteFooter />
