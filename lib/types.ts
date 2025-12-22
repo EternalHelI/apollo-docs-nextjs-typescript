@@ -15,8 +15,10 @@ export interface TrashItem {
   createdAt: number;
   updatedAt: number;
   deletedAt: number;
-  /** Stored as the raw JSON string of a Quill Delta for maximum backward-compatibility. */
+  /** Legacy v1/v2 editor content snapshot (Quill Delta JSON string). */
   delta: string | null;
+  /** v3+ editor content snapshot (TipTap JSON string). */
+  contentV2?: string | null;
 }
 
 export interface ChangelogSection {

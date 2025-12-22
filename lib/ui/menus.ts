@@ -151,10 +151,6 @@ export function initMenus(root: ParentNode = document): () => void {
       }
     });
 
-    on(m.panel, 'click', (e: Event) => {
-      try { e.stopPropagation(); } catch {}
-    });
-
     // Close on item click except Settings.
     on(m.panel, 'click', (e: MouseEvent) => {
       const t = e.target;

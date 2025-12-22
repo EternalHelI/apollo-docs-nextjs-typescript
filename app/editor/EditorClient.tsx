@@ -1,8 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import LinkExtension from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 
 import { Brand } from '@/components/Brand';
 import { SkipLink } from '@/components/SkipLink';
@@ -17,19 +23,43 @@ import { useToast } from '@/lib/hooks/useToast';
 
 import type { DocMeta } from '@/lib/types';
 import { createDoc, ensureDocMeta, migrateLegacyIfNeeded, setDocTitle, touchDoc } from '@/lib/docsStore';
-import { loadDeltaRaw, loadWordCountEnabled, saveDeltaRaw, storeWordCountEnabled } from '@/lib/storage';
-import { downloadBlob, fmtTime, safeFilename } from '@/lib/utils';
+import { loadContentV2Raw, loadDeltaRaw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
+import { downloadBlob, escapeHtml, fmtTime, safeFilename } from '@/lib/utils';
 import { loadScriptOnce } from '@/lib/externalScripts';
 
 type StatusTone = 'neutral' | 'ok' | 'warn' | 'err';
 
 function statusClass(tone: StatusTone): string {
   switch (tone) {
-    case 'ok': return 'status status--good';
+    case 'ok': return 'status status--ok';
     case 'warn': return 'status status--warn';
-    case 'err': return 'status status--bad';
-    default: return 'status status--neutral';
+    case 'err': return 'status status--err';
+    default: return 'status';
   }
+}
+
+function deltaToPlainText(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as any;
+    const ops: any[] = Array.isArray(parsed?.ops) ? parsed.ops : [];
+    let out = '';
+    for (const op of ops) {
+      const ins = op?.insert;
+      if (typeof ins === 'string') out += ins;
+      else if (ins && typeof ins === 'object') out += '\n';
+    }
+    return out;
+  } catch {
+    return '';
+  }
+}
+
+function textToBasicHtml(text: string): string {
+  const clean = (text || '').replace(/\r\n?/g, '\n').trim();
+  if (!clean) return '<p></p>';
+  const paras = clean.split(/\n{2,}/g).map(p => p.trim()).filter(Boolean);
+  const toP = (p: string) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`;
+  return paras.map(toP).join('');
 }
 
 export default function EditorClient(props: { initialId?: string }) {
@@ -43,18 +73,32 @@ export default function EditorClient(props: { initialId?: string }) {
   const { isDark, toggleTheme, toggleLabel: themeLabel } = useThemeMode();
   const toast = useToast();
 
-  const editorElRef = useRef<HTMLDivElement>(null);
-  const quillRef = useRef<any>(null);
   const autosaveTimerRef = useRef<number | null>(null);
   const statusTimerRef = useRef<number | null>(null);
   const dotsTimerRef = useRef<number | null>(null);
-  const initializedRef = useRef(false);
+  const hydratedForDocRef = useRef<string | null>(null);
 
   const [doc, setDoc] = useState<DocMeta | null>(null);
   const [title, setTitle] = useState('Apollo Document');
   const [status, setStatus] = useState<{ tone: StatusTone; text: string }>({ tone: 'neutral', text: 'Loading…' });
   const [wordCountEnabled, setWordCountEnabled] = useState(false);
   const [wordCount, setWordCount] = useState(0);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      LinkExtension.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+      Placeholder.configure({ placeholder: 'Start writing…' })
+    ],
+    editorProps: {
+      attributes: {
+        id: 'editor',
+        class: 'apollo-editor apollo-page-guides tiptap'
+      }
+    },
+    content: '<p></p>'
+  });
 
   // Resolve docId: migrate legacy single doc if needed, then ensure meta exists.
   useEffect(() => {
@@ -114,34 +158,29 @@ export default function EditorClient(props: { initialId?: string }) {
   }, [stopDots]);
 
   const computeWordCount = useCallback(() => {
-    const q = quillRef.current;
-    if (!q) return;
+    if (!editor) return;
     try {
-      const text: string = (q.getText?.() ?? '').trim();
-      if (!text) return setWordCount(0);
+      const text = (editor.getText() || '').trim();
+      if (!text) { setWordCount(0); return; }
       const words = text.split(/\s+/g).filter(Boolean).length;
       setWordCount(words);
     } catch {
       // ignore
     }
-  }, []);
+  }, [editor]);
 
   const persist = useCallback((mode: 'auto' | 'manual' | 'load' = 'auto') => {
-    const q = quillRef.current;
-    const meta = doc;
-    if (!q || !meta) return;
-
+    if (!doc || !editor) return;
     try {
-      setStatusNow(mode === 'manual' ? 'Saving…' : 'Autosaving…', 'neutral');
-      const delta = q.getContents?.();
-      const raw = JSON.stringify(delta ?? { ops: [] });
-      saveDeltaRaw(meta.id, raw);
-      try { touchDoc(meta.id); } catch {}
+      setStatusNow(mode === 'manual' ? 'Saving…' : (mode === 'load' ? 'Saving migrated…' : 'Autosaving…'), 'neutral');
+      const json = editor.getJSON();
+      saveContentV2Raw(doc.id, JSON.stringify(json));
+      try { touchDoc(doc.id); } catch {}
       setStatusNow('Saved.', 'ok');
     } catch {
       setStatusNow('Save failed.', 'err');
     }
-  }, [doc, setStatusNow]);
+  }, [doc, editor, setStatusNow]);
 
   const scheduleAutosave = useCallback(() => {
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
@@ -151,81 +190,67 @@ export default function EditorClient(props: { initialId?: string }) {
     }, 450);
   }, [persist]);
 
-  const loadSaved = useCallback(() => {
-    const meta = doc;
-    const q = quillRef.current;
-    if (!meta || !q) return;
-
-    try {
-      const raw = loadDeltaRaw(meta.id);
-      if (raw) {
-        q.setContents(JSON.parse(raw));
-        setStatusNow('Saved version loaded.', 'ok');
-        computeWordCount();
-        return;
-      }
-      setStatusNow('Nothing saved yet.', 'warn');
-    } catch {
-      setStatusNow('Load failed.', 'err');
-    }
-  }, [computeWordCount, doc, setStatusNow]);
-
-  const setWordCountPref = useCallback((enabled: boolean) => {
-    setWordCountEnabled(enabled);
-    storeWordCountEnabled(enabled);
-    if (enabled) window.setTimeout(computeWordCount, 0);
-  }, [computeWordCount]);
-
-  // Quill init + wiring.
+  // Load content for this doc.
   useEffect(() => {
-    if (!doc || !editorElRef.current) return;
-    if (initializedRef.current) return;
+    if (!doc || !editor) return;
+    if (hydratedForDocRef.current === doc.id) return;
+    hydratedForDocRef.current = doc.id;
 
-    initializedRef.current = true;
-
-    const run = async () => {
+    const run = () => {
       try {
         startDots('Loading editor');
-        await loadScriptOnce('https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js', () => window.Quill);
-        stopDots();
 
-        const Quill = window.Quill;
-        if (!Quill) throw new Error('Quill failed to load');
-
-        const q = new Quill(editorElRef.current!, {
-          theme: 'snow',
-          modules: { toolbar: '#toolbar' },
-          placeholder: 'Start writing…'
-        });
-
-        quillRef.current = q;
-
-        // Restore saved delta (if present)
-        try {
-          const raw = loadDeltaRaw(doc.id);
-          if (raw) q.setContents(JSON.parse(raw));
-        } catch {
-          // ignore
+        // Prefer v2 content (TipTap JSON)
+        const rawV2 = loadContentV2Raw(doc.id);
+        if (rawV2) {
+          editor.commands.setContent(JSON.parse(rawV2));
+          stopDots();
+          setStatusNow('Ready.', 'neutral');
+          computeWordCount();
+          return;
         }
 
-        computeWordCount();
+        // Fallback: legacy delta (Quill) -> best-effort text migration.
+        const legacyDelta = loadDeltaRaw(doc.id);
+        if (legacyDelta) {
+          const text = deltaToPlainText(legacyDelta);
+          editor.commands.setContent(textToBasicHtml(text), false);
+          stopDots();
+          setStatusNow('Migrated legacy content.', 'ok');
+          computeWordCount();
+          // Persist immediately so subsequent loads use the modern format.
+          window.setTimeout(() => persist('load'), 0);
+          return;
+        }
+
+        stopDots();
         setStatusNow('Ready.', 'neutral');
-
-        // Autosave on user edits
-        q.on('text-change', (_delta: any, _old: any, source: string) => {
-          if (source !== 'user') return;
-          if (wordCountEnabled) window.requestIdleCallback?.(() => computeWordCount());
-          scheduleAutosave();
-        });
-
+        computeWordCount();
       } catch {
         stopDots();
         setStatusNow('Editor failed to load.', 'err');
       }
     };
 
-    void run();
-  }, [computeWordCount, doc, scheduleAutosave, setStatusNow, startDots, stopDots, wordCountEnabled]);
+    run();
+  }, [computeWordCount, doc, editor, persist, setStatusNow, startDots, stopDots]);
+
+  // Autosave on user edits
+  useEffect(() => {
+    if (!editor) return;
+    const handler = () => {
+      if (wordCountEnabled) {
+        const idle = (window as any).requestIdleCallback as ((cb: () => void) => void) | undefined;
+        if (typeof idle === 'function') idle(() => computeWordCount()); else computeWordCount();
+      }
+      scheduleAutosave();
+    };
+
+    editor.on('update', handler);
+    return () => {
+      try { editor.off('update', handler); } catch {}
+    };
+  }, [computeWordCount, editor, scheduleAutosave, wordCountEnabled]);
 
   // Ctrl/Cmd+S manual save
   useEffect(() => {
@@ -246,11 +271,13 @@ export default function EditorClient(props: { initialId?: string }) {
     try { setDocTitle(doc.id, title || 'Apollo Document'); } catch {}
   }, [doc, title]);
 
-  const goHome = useCallback(() => {
-    router.push('/homepage');
-  }, [router]);
+  const setWordCountPref = useCallback((enabled: boolean) => {
+    setWordCountEnabled(enabled);
+    storeWordCountEnabled(enabled);
+    if (enabled) window.setTimeout(computeWordCount, 0);
+  }, [computeWordCount]);
 
-  // --- Save As helpers ---
+  // --- Save As helpers (nested subpanel) ---
   const closeSaveAsMenu = useCallback((animate = true) => {
     const menu = document.getElementById('menuSaveAs') as HTMLElement | null;
     const btn = document.getElementById('btnSaveAs') as HTMLButtonElement | null;
@@ -289,48 +316,55 @@ export default function EditorClient(props: { initialId?: string }) {
     if (menu.hidden) openSaveAsMenu(); else closeSaveAsMenu();
   }, [closeSaveAsMenu, openSaveAsMenu]);
 
-  // --- Export ---
+  // --- Export helpers ---
+  const getEditorHtml = useCallback(() => {
+    try { return editor ? (editor.getHTML?.() || '') : ''; } catch { return ''; }
+  }, [editor]);
+
+  const getEditorText = useCallback(() => {
+    try { return editor ? (editor.getText?.() || '') : ''; } catch { return ''; }
+  }, [editor]);
+
   const saveAsJson = useCallback(() => {
     if (!doc) return;
     try {
-      const q = quillRef.current;
       const payload = {
-        version: 1,
+        version: 2,
         id: doc.id,
         title: title || 'Apollo Document',
         savedAt: new Date().toISOString(),
-        delta: q?.getContents?.() ?? { ops: [] },
-        html: q?.root?.innerHTML ?? '',
-        text: q?.getText?.() ?? ''
+        tiptap: editor ? editor.getJSON() : null,
+        html: getEditorHtml(),
+        text: getEditorText()
       };
       downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), safeFilename(title, 'json'));
       setStatusNow(`Saved As JSON @ ${fmtTime(Date.now())}`, 'ok');
     } catch {
       setStatusNow('Save As failed.', 'err');
     }
-  }, [doc, setStatusNow, title]);
+  }, [doc, editor, getEditorHtml, getEditorText, setStatusNow, title]);
 
   const getPrintableContainer = useCallback(() => {
     const wrapper = document.createElement('div');
     wrapper.style.background = '#ffffff';
     wrapper.style.color = '#0a0c12';
     wrapper.style.padding = '40px';
-    wrapper.style.fontFamily = 'Roboto, Arial, sans-serif';
+    wrapper.style.fontFamily = 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
     wrapper.style.maxWidth = '900px';
     wrapper.style.margin = '0 auto';
-    wrapper.innerHTML = quillRef.current ? (quillRef.current.root?.innerHTML ?? '') : '';
+    wrapper.innerHTML = getEditorHtml();
     return wrapper;
-  }, []);
+  }, [getEditorHtml]);
 
   const exportPDF = useCallback(async () => {
     try {
       startDots('Preparing PDF');
-      await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js', () => window.html2pdf);
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js', () => (window as any).html2pdf);
       stopDots();
 
       setStatusNow('Exporting PDF…', 'warn');
       const filename = safeFilename(title, 'pdf');
-      await window.html2pdf().set({
+      await (window as any).html2pdf().set({
         margin: 10,
         filename,
         image: { type: 'jpeg', quality: 0.95 },
@@ -348,27 +382,26 @@ export default function EditorClient(props: { initialId?: string }) {
   const exportDOCX = useCallback(async () => {
     try {
       startDots('Preparing DOCX');
-      await loadScriptOnce('https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js', () => window.htmlDocx);
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js', () => (window as any).htmlDocx);
       stopDots();
 
-      const htmlBody = quillRef.current ? (quillRef.current.root?.innerHTML ?? '') : '';
+      const htmlBody = getEditorHtml();
       const docHtml = `<!doctype html><html><head><meta charset="utf-8"></head><body>${htmlBody}</body></html>`;
-      downloadBlob(window.htmlDocx.asBlob(docHtml), safeFilename(title, 'docx'));
+      downloadBlob((window as any).htmlDocx.asBlob(docHtml), safeFilename(title, 'docx'));
       setStatusNow(`DOCX exported @ ${fmtTime(Date.now())}`, 'ok');
     } catch {
       stopDots();
       setStatusNow('DOCX export failed.', 'err');
     }
-  }, [setStatusNow, startDots, stopDots, title]);
+  }, [getEditorHtml, setStatusNow, startDots, stopDots, title]);
 
   const exportODT = useCallback(async () => {
     try {
       startDots('Preparing ODT');
-      await loadScriptOnce('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', () => window.JSZip);
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', () => (window as any).JSZip);
       stopDots();
 
-      const q = quillRef.current;
-      const text: string = q ? (q.getText?.() ?? '') : '';
+      const text = getEditorText();
       const paras = text.split('\n').map(t => t.trim()).filter(Boolean);
       const escapeXml = (s: string) => s
         .replace(/&/g, '&amp;')
@@ -381,12 +414,11 @@ export default function EditorClient(props: { initialId?: string }) {
 
       const stylesXml = `<?xml version="1.0" encoding="UTF-8"?>\n<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.2"><office:styles/></office:document-styles>`;
 
-      const metaXml = `<?xml version="1.0" encoding="UTF-8"?>\n<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.2">\n <office:meta><meta:generator>Apollo Documents</meta:generator></office:meta>
-</office:document-meta>`;
+      const metaXml = `<?xml version="1.0" encoding="UTF-8"?>\n<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.2">\n <office:meta><meta:generator>Apollo Documents</meta:generator></office:meta>\n</office:document-meta>`;
 
       const manifestXml = `<?xml version="1.0" encoding="UTF-8"?>\n<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">\n <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/>\n <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>\n <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>\n <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="meta.xml"/>\n</manifest:manifest>`;
 
-      const zip = new window.JSZip();
+      const zip = new (window as any).JSZip();
       zip.file('mimetype', 'application/vnd.oasis.opendocument.text', { compression: 'STORE' });
       zip.file('content.xml', contentXml);
       zip.file('styles.xml', stylesXml);
@@ -400,12 +432,11 @@ export default function EditorClient(props: { initialId?: string }) {
       stopDots();
       setStatusNow('ODT export failed.', 'err');
     }
-  }, [setStatusNow, startDots, stopDots, title]);
+  }, [getEditorText, setStatusNow, startDots, stopDots, title]);
 
   const onPrint = useCallback(async () => {
     try {
-      const q = quillRef.current;
-      const contentHtml = (q && q.root) ? q.root.innerHTML : '';
+      const contentHtml = getEditorHtml();
 
       const iframe = document.createElement('iframe');
       iframe.setAttribute('title', 'Print');
@@ -425,26 +456,22 @@ export default function EditorClient(props: { initialId?: string }) {
       const printCss = `
         @page { size: Letter; margin: 1in; }
         html, body { background: #ffffff; color: #0a0c12; }
-        body { margin: 0; }
-        .ql-container { border: none !important; }
-        .ql-editor{
-          padding: 0 !important;
-          font-family: "Inter", system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-          font-size: 12pt;
-          line-height: 1.45;
-        }
-        .ql-editor, .ql-container, .ql-snow{ height: auto !important; max-height: none !important; overflow: visible !important; }
+        body { margin: 0; font-family: "Inter", system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
         img{ max-width: 100% !important; height: auto !important; }
         a{ color: inherit; text-decoration: underline; }
         pre, code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 10.5pt; }
+        h1{ font-size: 20pt; margin: 0 0 10px; }
+        h2{ font-size: 16pt; margin: 0 0 10px; }
+        h3{ font-size: 13pt; margin: 0 0 10px; }
+        p{ margin: 0 0 10px; }
+        ul, ol{ margin: 0 0 10px 22px; }
       `;
 
       const html = `<!doctype html><html><head><meta charset="utf-8" />
         <title>Print</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
         <style>${printCss}</style>
       </head><body>
-        <div class="ql-snow"><div class="ql-editor">${contentHtml}</div></div>
+        ${contentHtml}
       </body></html>`;
 
       printDoc.open();
@@ -485,9 +512,42 @@ export default function EditorClient(props: { initialId?: string }) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [getEditorHtml]);
 
   const statusAria = useMemo(() => status.text, [status.text]);
+
+  // Toolbar state
+  const headingValue = useMemo(() => {
+    if (!editor) return '';
+    if (editor.isActive('heading', { level: 1 })) return '1';
+    if (editor.isActive('heading', { level: 2 })) return '2';
+    if (editor.isActive('heading', { level: 3 })) return '3';
+    return '';
+  }, [editor, editor?.state]);
+
+  const setHeading = useCallback((v: string) => {
+    if (!editor) return;
+    const lvl = Number(v);
+    if (!lvl) editor.chain().focus().setParagraph().run();
+    else editor.chain().focus().toggleHeading({ level: Math.max(1, Math.min(3, lvl)) as 1 | 2 | 3 }).run();
+  }, [editor]);
+
+  const setOrUnsetLink = useCallback(() => {
+    if (!editor) return;
+    try {
+      const prev = editor.getAttributes('link')?.href as string | undefined;
+      const url = window.prompt('Link URL', prev ?? '');
+      if (url === null) return;
+      const clean = url.trim();
+      if (!clean) {
+        editor.chain().focus().unsetLink().run();
+        return;
+      }
+      editor.chain().focus().extendMarkRange('link').setLink({ href: clean }).run();
+    } catch {
+      // ignore
+    }
+  }, [editor]);
 
   return (
     <>
@@ -540,19 +600,9 @@ export default function EditorClient(props: { initialId?: string }) {
                   <div className="menu-sep" />
                   <div className="menu-label">File</div>
 
-                  <button className="menu-item" id="btnNew" type="button" onClick={goHome}>
-                    <div className="menu-item-title">New</div>
-                    <div className="menu-item-desc">Return to the documents list</div>
-                  </button>
-
                   <button className="menu-item" id="btnSave" type="button" onClick={() => persist('manual')}>
                     <div className="menu-item-title">Save</div>
                     <div className="menu-item-desc">Manual snapshot (Ctrl/Cmd+S)</div>
-                  </button>
-
-                  <button className="menu-item" id="btnLoad" type="button" onClick={loadSaved}>
-                    <div className="menu-item-title">Reload saved</div>
-                    <div className="menu-item-desc">Restore last saved version</div>
                   </button>
 
                   <div className="menu-sep" />
@@ -597,37 +647,34 @@ export default function EditorClient(props: { initialId?: string }) {
 
         <div className="toolstrip" id="toolstrip">
           <div className="toolstrip-inner">
-            <div aria-label="Editor toolbar" id="toolbar" role="toolbar">
-              <span className="ql-formats">
-                <select aria-label="Heading" className="ql-header" defaultValue="">
-                  <option value=""></option>
-                  <option value="1"></option>
-                  <option value="2"></option>
-                  <option value="3"></option>
-                </select>
-                <select aria-label="Font size" className="ql-size" defaultValue="">
-                  <option value="small"></option>
-                  <option value=""></option>
-                  <option value="large"></option>
-                  <option value="huge"></option>
+            <div aria-label="Editor toolbar" className="tt-toolbar" id="toolbar" role="toolbar">
+              <span className="tt-group">
+                <label className="sr-only" htmlFor="ttHeading">Heading</label>
+                <select aria-label="Heading" id="ttHeading" value={headingValue} onChange={(e) => setHeading(e.target.value)} disabled={!editor}>
+                  <option value="">Normal</option>
+                  <option value="1">Heading 1</option>
+                  <option value="2">Heading 2</option>
+                  <option value="3">Heading 3</option>
                 </select>
               </span>
-              <span className="ql-formats">
-                <button aria-label="Bold" className="ql-bold"></button>
-                <button aria-label="Italic" className="ql-italic"></button>
-                <button aria-label="Underline" className="ql-underline"></button>
-                <button aria-label="Strikethrough" className="ql-strike"></button>
+
+              <span className="tt-group">
+                <button type="button" className={`tt-btn${editor?.isActive('bold') ? ' is-active' : ''}`} aria-label="Bold" onClick={() => editor?.chain().focus().toggleBold().run()} disabled={!editor}>B</button>
+                <button type="button" className={`tt-btn${editor?.isActive('italic') ? ' is-active' : ''}`} aria-label="Italic" onClick={() => editor?.chain().focus().toggleItalic().run()} disabled={!editor}>I</button>
+                <button type="button" className={`tt-btn${editor?.isActive('underline') ? ' is-active' : ''}`} aria-label="Underline" onClick={() => editor?.chain().focus().toggleUnderline().run()} disabled={!editor}>U</button>
+                <button type="button" className={`tt-btn${editor?.isActive('strike') ? ' is-active' : ''}`} aria-label="Strikethrough" onClick={() => editor?.chain().focus().toggleStrike().run()} disabled={!editor}>S</button>
               </span>
-              <span className="ql-formats">
-                <button aria-label="Numbered list" className="ql-list" value="ordered"></button>
-                <button aria-label="Bullet list" className="ql-list" value="bullet"></button>
-                <button aria-label="Decrease indent" className="ql-indent" value="-1"></button>
-                <button aria-label="Increase indent" className="ql-indent" value="+1"></button>
+
+              <span className="tt-group">
+                <button type="button" className={`tt-btn${editor?.isActive('orderedList') ? ' is-active' : ''}`} aria-label="Numbered list" onClick={() => editor?.chain().focus().toggleOrderedList().run()} disabled={!editor}>1.</button>
+                <button type="button" className={`tt-btn${editor?.isActive('bulletList') ? ' is-active' : ''}`} aria-label="Bullet list" onClick={() => editor?.chain().focus().toggleBulletList().run()} disabled={!editor}>•</button>
+                <button type="button" className={`tt-btn${editor?.isActive('blockquote') ? ' is-active' : ''}`} aria-label="Blockquote" onClick={() => editor?.chain().focus().toggleBlockquote().run()} disabled={!editor}>❝</button>
+                <button type="button" className={`tt-btn${editor?.isActive('codeBlock') ? ' is-active' : ''}`} aria-label="Code block" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} disabled={!editor}>⌘</button>
               </span>
-              <span className="ql-formats">
-                <select aria-label="Alignment" className="ql-align"></select>
-                <button aria-label="Insert link" className="ql-link"></button>
-                <button aria-label="Clear formatting" className="ql-clean"></button>
+
+              <span className="tt-group">
+                <button type="button" className={`tt-btn${editor?.isActive('link') ? ' is-active' : ''}`} aria-label="Insert link" onClick={setOrUnsetLink} disabled={!editor}>Link</button>
+                <button type="button" className="tt-btn" aria-label="Clear formatting" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()} disabled={!editor}>Clear</button>
               </span>
             </div>
 
@@ -636,7 +683,7 @@ export default function EditorClient(props: { initialId?: string }) {
         </div>
 
         <section className="panel">
-          <div id="editor" ref={editorElRef} tabIndex={-1} />
+          <EditorContent editor={editor} />
         </section>
 
         <ToastHost toastRef={toast.refs.toastRef} textRef={toast.refs.textRef} timerRef={toast.refs.timerRef} variant="danger" />

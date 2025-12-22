@@ -9,7 +9,7 @@ Apollo Documents is a local-first, browser-based document list + editor. Documen
 - **Next.js App Router** with routes:
   - `/homepage` — document list
   - `/archive` — Archive/Trash with 30-day retention
-  - `/editor` — document editor (Quill)
+  - `/editor` — document editor (TipTap)
   - `/changelogs` — changelog timeline & modal detail
 - **TypeScript** for all application logic (storage, menus, pages, and UI glue)
 - Preserved localStorage keys and data model so existing documents remain available after migration
@@ -69,7 +69,8 @@ All content is stored in the browser.
 
 - Document index: `apollo_docs_index_v1`
 - Trash/Archive: `apollo_docs_trash_v1`
-- Per-document content: `apollo_docs_content_<docId>` (Quill Delta JSON as a raw string)
+- Per-document content (legacy v1/v2): `apollo_docs_doc_<docId>_delta` (Quill Delta JSON as a raw string)
+- Per-document content (v3+): `apollo_docs_doc_<docId>_content_v2` (TipTap JSON as a raw string)
 - Preferences:
   - Theme: `apollo_docs_theme_v1`
   - Docs view: `apollo_docs_view_v1`
@@ -80,9 +81,8 @@ All content is stored in the browser.
 
 ### I see “Editor failed to load”
 
-- The editor depends on the Quill CDN script. Confirm the browser can reach:
-  - `https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js`
-- Some extensions/ad-blockers can block CDNs; try disabling them for the site.
+- This build uses TipTap (bundled via npm), so there is no CDN requirement for the editor itself.
+- If you still see a failure, check the browser console for errors and confirm the deployment includes installed dependencies.
 
 ### Private/Incognito mode warning
 

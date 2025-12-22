@@ -1,5 +1,5 @@
-/* Apollo Documents — UI + Quill skin (Snow)
-   Plain HTML/CSS/JS, designed for GitHub Pages.
+/* Apollo Documents — UI + TipTap skin
+   Next.js + React + TypeScript.
 */
 
 /* ========== Theme tokens ========== */
@@ -535,14 +535,30 @@ button,input{font:inherit}
 }
 :root[data-theme="light"] #toolbar{ background: rgba(10,12,18,.03); }
 
-/* Quill editor font defaults */
-.ql-container{ border: none !important; font-family: "Roboto", system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-  height: auto;
+/* TipTap / ProseMirror editor */
+.apollo-editor{
+  min-height: 520px;
+  padding: 18px;
+  font-size: 16px;
+  line-height: 1.55;
+  outline: none;
+  /* ProseMirror sets its own styles; we only provide layout + typography defaults. */
 }
-.ql-editor{ min-height: 520px; padding: 18px; font-size: 16px; line-height:1.55; height: auto; overflow: visible; }
+.apollo-editor :where(p){ margin: 0 0 10px; }
+.apollo-editor :where(h1){ font-size: 28px; margin: 0 0 10px; line-height: 1.25; }
+.apollo-editor :where(h2){ font-size: 22px; margin: 0 0 10px; line-height: 1.25; }
+.apollo-editor :where(h3){ font-size: 18px; margin: 0 0 10px; line-height: 1.25; }
+.apollo-editor :where(ul, ol){ margin: 0 0 10px 22px; }
+.apollo-editor :where(blockquote){ margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid rgba(255,106,42,.6); background: rgba(0,0,0,.10); border-radius: 12px; }
+:root[data-theme="light"] .apollo-editor :where(blockquote){ background: rgba(10,12,18,.03); }
+.apollo-editor :where(pre){ margin: 0 0 10px; padding: 12px; border-radius: 14px; border: 1px solid var(--stroke); background: rgba(0,0,0,.14); overflow: auto; }
+:root[data-theme="light"] .apollo-editor :where(pre){ background: rgba(10,12,18,.03); }
+.apollo-editor :where(code){ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .95em; }
+.apollo-editor :where(a){ color: rgba(255,106,42,.92); text-decoration: underline; }
+:root[data-theme="light"] .apollo-editor :where(a){ color: rgba(196,74,12,.96); }
 
 /* Page break guides (Letter size) — on-screen only */
-.ql-editor.apollo-page-guides{
+.apollo-editor.apollo-page-guides{
   /* Typical Letter: 11in height. We assume 1in margins -> 9in content height. */
   --apollo-letter-content-height: 9in;
   background-image:
@@ -559,7 +575,7 @@ button,input{font:inherit}
   background-clip: content-box;
   background-position: 0 0;
 }
-:root[data-theme="light"] .ql-editor.apollo-page-guides{
+:root[data-theme="light"] .apollo-editor.apollo-page-guides{
   background-image:
     linear-gradient(
       to bottom,
@@ -568,30 +584,47 @@ button,input{font:inherit}
       rgba(10,12,18,.14) var(--apollo-letter-content-height)
     );
 }
+/* TipTap toolbar */
+.tt-toolbar{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--stroke);
+  border-bottom: 1px solid var(--stroke);
+  background: rgba(0,0,0,.10);
+}
+:root[data-theme="light"] .tt-toolbar{ background: rgba(10,12,18,.03); }
 
-.ql-toolbar.ql-snow{ border: none !important; }
+.tt-group{ display: inline-flex; align-items: center; gap: 6px; }
+.tt-toolbar select{
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.14);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+:root[data-theme="light"] .tt-toolbar select{ background: rgba(10,12,18,.04); }
 
-/* Quill toolbar interactions — match site button motion */
-.ql-toolbar button,
-.ql-toolbar .ql-picker-label{
+.tt-btn{
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.14);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
   will-change: transform;
-  transition: transform .18s cubic-bezier(.2,.8,.2,1), background .12s ease;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), background .12s ease, border-color .12s ease;
 }
-.ql-toolbar button:hover,
-.ql-toolbar .ql-picker-label:hover{
-  animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both;
-}
-.ql-toolbar button:active,
-.ql-toolbar .ql-picker-label:active{
-  animation: none;
-  transform: translateY(0) scale(.98);
-}
-
-
-/* Quill icons contrast in dark */
-:root:not([data-theme="light"]) .ql-snow .ql-stroke{ stroke: rgba(255,255,255,.86); }
-:root:not([data-theme="light"]) .ql-snow .ql-fill{ fill: rgba(255,255,255,.86); }
-:root:not([data-theme="light"]) .ql-snow .ql-picker{ color: rgba(255,255,255,.86); }
+:root[data-theme="light"] .tt-btn{ background: rgba(10,12,18,.04); }
+.tt-btn:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both; }
+:root[data-theme="light"] .tt-btn:hover{ background: rgba(10,12,18,.04); border-color: rgba(10,12,18,.08); }
+.tt-btn:active{ animation: none; transform: translateY(0) scale(.99); }
+.tt-btn:disabled{ opacity: .55; cursor: not-allowed; }
+.tt-btn.is-active{ border-color: rgba(255,106,42,.55); box-shadow: 0 0 0 4px var(--focus); }
 
 /* Loading overlay */
 .loading{
@@ -712,13 +745,9 @@ button,input{font:inherit}
     overflow: visible !important;
   }
 
-  /* Ensure Quill content prints cleanly */
-  .ql-container{
-    border: none !important;
-    height: auto !important;
-  }
-
-  .ql-editor{
+  /* Ensure editor content prints cleanly */
+  #editor,
+  .apollo-editor{
     padding: 0 !important;
     min-height: auto !important;
     height: auto !important;
@@ -729,12 +758,11 @@ button,input{font:inherit}
     color: #0a0c12 !important;
     background: transparent !important;
   }
-  .ql-editor.apollo-page-guides{ background: none !important; }
+  .apollo-editor.apollo-page-guides{ background: none !important; }
 
-  /* Ensure editor container doesn't clip (Quill defaults can be scrollable) */
+  /* Ensure editor container doesn't clip */
   #editor,
-  .ql-container,
-  .ql-editor{
+  .apollo-editor{
     overflow: visible !important;
   }
 
@@ -947,50 +975,6 @@ html::before{
 
 
 
-/* ========== Quill pickers: keep Snow defaults (clean text) with site colors ========== */
-/* Keep labels unboxed and minimal (no pill background, no borders). */
-.ql-snow .ql-picker-label{
-  border: none !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: var(--text) !important;
-}
-
-/* Light theme: keep labels readable on the lighter toolbar */
-:root[data-theme="light"] .ql-snow .ql-picker-label{
-  color: rgba(10,12,18,.92) !important;
-}
-
-/* Keep a small gap between adjacent pickers */
-.ql-snow .ql-formats .ql-picker + .ql-picker{
-  margin-left: 10px;
-}
-
-/* Dropdown styling: use site surfaces, but keep Quill's icon sizing */
-.ql-snow .ql-picker-options{
-  background: var(--bg1) !important;
-  border: 1px solid var(--stroke) !important;
-  border-radius: 14px !important;
-  top: calc(100% + 10px) !important; /* breathing room below picker */
-  padding: 6px !important;
-  box-shadow: 0 14px 40px rgba(0,0,0,.30);
-}
-.ql-snow .ql-picker-options .ql-picker-item{
-  border-radius: 10px !important;
-  color: var(--text) !important;
-}
-.ql-snow .ql-picker-options .ql-picker-item:hover,
-.ql-snow .ql-picker-options .ql-picker-item.ql-selected{
-  background: var(--panel) !important;
-}
-
-/* Ensure the default picker text/icons inherit the theme color */
-.ql-snow .ql-picker-label::before,
-.ql-snow .ql-picker-options .ql-picker-item::before{
-  color: var(--text) !important;
-}
-
 /* ========== Toast notifications ========== */
 .toast{
   position: fixed;
@@ -1108,51 +1092,6 @@ html::before{
   align-items: center;
   gap: 8px;
 }
-
-
-/* ========== Quill toolbar icon sizing (restore alignment icons) ========== */
-.ql-snow.ql-toolbar button,
-.ql-snow .ql-toolbar button{
-  width: 34px;
-  height: 34px;
-}
-.ql-snow.ql-toolbar button svg,
-.ql-snow .ql-toolbar button svg{
-  width: 18px;
-  height: 18px;
-}
-
-/* ========== Quill toolbar motion ========== */
-.ql-snow.ql-toolbar button:hover,
-.ql-snow .ql-toolbar button:hover{
-  animation: apollo-btn-bounce .18s cubic-bezier(.2,.9,.2,1) both;
-}
-.ql-snow.ql-toolbar button:active,
-.ql-snow .ql-toolbar button:active{
-  animation: none;
-  transform: translateY(0) scale(.98);
-}
-
-/* Quill alignment picker motion — match toolbar icon bounce */
-.ql-snow .ql-picker.ql-align .ql-picker-label{
-  will-change: transform;
-  transition: transform .18s cubic-bezier(.2,.8,.2,1);
-}
-.ql-snow .ql-picker.ql-align .ql-picker-label:hover{
-  animation: apollo-btn-bounce .18s cubic-bezier(.2,.9,.2,1) both;
-}
-.ql-snow .ql-picker.ql-align .ql-picker-label:active{
-  animation: none;
-  transform: translateY(0) scale(.98);
-}
-/* Slightly boost the collapsed alignment icon (dropdown icons remain unchanged). */
-.ql-snow .ql-picker.ql-align .ql-picker-label::before{
-  transform: scale(1.12);
-  transform-origin: center;
-  display: inline-block;
-}
-
-
 
 
 /* ========== Options icon (PNG) ========== */
@@ -1640,7 +1579,7 @@ html::before{
 /* ========== Reduced motion ========== */
 @media (prefers-reduced-motion: reduce){
   .btn, .menu-item, .icon-btn,
-  .ql-snow.ql-toolbar button, .ql-snow .ql-toolbar button{
+  .tt-btn{
     transition: none !important;
     animation: none !important;
   }

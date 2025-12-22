@@ -1,5 +1,5 @@
 import type { DocMeta, TrashItem } from '@/lib/types';
-import { getContentKey, loadDeltaRaw, loadIndex, loadTrash, removeDelta, saveIndex, saveTrash } from '@/lib/storage';
+import { getContentKey, getContentKeyV2, loadContentV2Raw, loadDeltaRaw, loadIndex, loadTrash, removeContentV2, removeDelta, saveIndex, saveTrash } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -72,13 +72,15 @@ export function moveToArchive(docId: string): boolean {
 
   const trash = loadTrash();
   const delta = loadDeltaRaw(docId);
+  const contentV2 = loadContentV2Raw(docId);
   const item: TrashItem = {
     id: doc.id,
     title: doc.title || 'Untitled',
     createdAt: doc.createdAt || Date.now(),
     updatedAt: doc.updatedAt || Date.now(),
     deletedAt: Date.now(),
-    delta: delta ?? null
+    delta: delta ?? null,
+    contentV2: contentV2 ?? null
   };
   trash.push(item);
   saveTrash(trash);
@@ -94,6 +96,7 @@ export function purgeExpiredTrash(): TrashItem[] {
     const expired = trash.filter(t => !kept.includes(t));
     expired.forEach(t => {
       try { removeDelta(t.id); } catch {}
+      try { removeContentV2(t.id); } catch {}
     });
     saveTrash(kept);
   }
@@ -118,8 +121,11 @@ export function restoreFromArchive(id: string): boolean {
   saveIndex(idx);
 
   try {
-    if (item.delta) {
-      // Write under the new ID.
+    // Prefer modern content snapshot when available.
+    if (item.contentV2) {
+      window.localStorage.setItem(getContentKeyV2(newId), item.contentV2);
+    } else if (item.delta) {
+      // Legacy snapshots (v1/v2): preserve under legacy key for best-effort migration.
       window.localStorage.setItem(getContentKey(newId), item.delta);
     }
   } catch {}
@@ -137,6 +143,7 @@ export function permanentlyDeleteFromArchive(id: string): boolean {
   trash.splice(trash.indexOf(item), 1);
   saveTrash(trash);
   removeDelta(id);
+  removeContentV2(id);
   return true;
 }
 

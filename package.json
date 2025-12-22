@@ -1,6 +1,6 @@
 {
   "name": "apollo-website",
-  "version": "2.0.4",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,12 @@
   "dependencies": {
     "next": "16.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@tiptap/react": "^2.13.1",
+    "@tiptap/starter-kit": "^2.13.1",
+    "@tiptap/extension-underline": "^2.13.1",
+    "@tiptap/extension-link": "^2.13.1",
+    "@tiptap/extension-placeholder": "^2.13.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

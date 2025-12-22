@@ -14,6 +14,12 @@ export function getContentKey(id: string): string {
   return `apollo_docs_doc_${id}_delta`;
 }
 
+// v2+ content storage (TipTap JSON). We keep the legacy key above for backwards compatibility,
+// and only write to this key from modern editor builds.
+export function getContentKeyV2(id: string): string {
+  return `apollo_docs_doc_${id}_content_v2`;
+}
+
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
@@ -142,6 +148,21 @@ export function loadDeltaRaw(docId: string): string | null {
 export function saveDeltaRaw(docId: string, raw: string): void {
   if (!isBrowser()) return;
   try { window.localStorage.setItem(getContentKey(docId), raw); } catch {}
+}
+
+export function loadContentV2Raw(docId: string): string | null {
+  if (!isBrowser()) return null;
+  try { return window.localStorage.getItem(getContentKeyV2(docId)); } catch { return null; }
+}
+
+export function saveContentV2Raw(docId: string, raw: string): void {
+  if (!isBrowser()) return;
+  try { window.localStorage.setItem(getContentKeyV2(docId), raw); } catch {}
+}
+
+export function removeContentV2(docId: string): void {
+  if (!isBrowser()) return;
+  try { window.localStorage.removeItem(getContentKeyV2(docId)); } catch {}
 }
 
 export function removeDelta(docId: string): void {

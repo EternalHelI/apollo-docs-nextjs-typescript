@@ -17,6 +17,37 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.0.0',
+  date: '2025-12-21',
+  time: '11:55 PM PST',
+  title: 'Editor overhaul: TipTap + interaction fixes',
+  summary: 'Replaced the Quill editor with TipTap and fixed dropdown/menu interactions that prevented in-menu buttons (theme, view mode, options) from firing in the Next.js/React build.',
+  sections: [
+    {
+      title: 'Editor',
+      items: [
+        'Removed Quill entirely and implemented the document editor with TipTap (Starter Kit + Underline + Link + Placeholder).',
+        'Added a lightweight TipTap toolbar with headings, inline formatting, lists, blockquote, code blocks, links, and a clear-format action.',
+        'Kept “Save As” exports (JSON/PDF/DOCX/ODT) by generating output from editor HTML, with CDNs still used only for export libraries.'
+      ]
+    },
+    {
+      title: 'UI reliability',
+      items: [
+        'Fixed a React event propagation conflict in the dropdown menu controller that prevented button onClick handlers from firing inside open menus.',
+        'Dark mode/light mode, list/grid toggles, and Options dropdown actions now work consistently across pages.'
+      ]
+    },
+    {
+      title: 'Storage compatibility',
+      items: [
+        'Introduced a new TipTap content key (`apollo_docs_doc_<id>_content_v2`) while preserving the legacy Quill Delta key for backward compatibility.',
+        'Added a best-effort legacy migration path: if only a Quill Delta exists, the editor will import the plain text into TipTap on first open.'
+      ]
+    }
+  ]
+},
+{
   version: 'v2.0.4',
   date: '2025-12-21',
   time: '10:15 PM PST',
