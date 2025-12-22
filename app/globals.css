@@ -1,0 +1,1654 @@
+/* Apollo Documents — UI + Quill skin (Snow)
+   Plain HTML/CSS/JS, designed for GitHub Pages.
+*/
+
+/* ========== Theme tokens ========== */
+:root{
+  --bg0: #07080b;
+  --bg1: #0b0d13;
+  --panel: rgba(255,255,255,.06);
+  --panel2: rgba(255,255,255,.04);
+  --stroke: rgba(255,255,255,.12);
+  --stroke2: rgba(255,255,255,.18);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.62);
+  --muted2: rgba(255,255,255,.48);
+  --accent: #ff6a2a;
+  --accent2: #ff3d7f;
+  --focus: rgba(255,106,42,.22);
+  --shadow: 0 18px 60px rgba(0,0,0,.45);
+  --radius: 18px;
+
+  --ok: rgba(34,197,94,.45);
+  --warn: rgba(255,183,0,.45);
+  --err: rgba(239,68,68,.45);
+}
+
+:root[data-theme="light"]{
+  --bg0: #f6f7fb;
+  --bg1: #ffffff;
+  --panel: rgba(10,12,18,.04);
+  --panel2: rgba(10,12,18,.03);
+  --stroke: rgba(10,12,18,.10);
+  --stroke2: rgba(10,12,18,.14);
+  --text: rgba(10,12,18,.92);
+  --muted: rgba(10,12,18,.62);
+  --muted2: rgba(10,12,18,.50);
+  --shadow: 0 18px 60px rgba(0,0,0,.12);
+
+  --ok: rgba(34,197,94,.75);
+  --warn: rgba(255,183,0,.75);
+  --err: rgba(239,68,68,.78);
+}
+
+/* ========== Fonts (self-hosted) ========== */
+@font-face{font-family:"Inter";src:url("/fonts/Inter-Latin.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:"Roboto";src:url("/fonts/Roboto-Latin.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+
+/* ========== Base ========== */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 700px at 12% 20%, rgba(255,106,42,.18), transparent 60%),
+    radial-gradient(900px 600px at 88% 24%, rgba(255,61,127,.14), transparent 58%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+  font-family: "Inter", system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  line-height:1.35;
+}
+
+
+/* ========== Page loader (0.5s) ========== */
+@keyframes apollo-spin{ to { transform: rotate(360deg); } }
+
+.page-loader{
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0,0,0,.10);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+  opacity: 0;
+  transition: opacity .18s ease;
+  pointer-events: none; /* never block clicks */
+}
+.page-loader.is-on{ opacity: 1; }
+.page-loader.is-off{ opacity: 0; }
+.page-loader-inner{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+:root[data-theme="light"] .page-loader-inner{
+  border-color: rgba(10,12,18,.14);
+  background: rgba(255,255,255,.88);
+}
+.page-loader-spinner{
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.22);
+  border-top-color: rgba(255,255,255,.92);
+  animation: apollo-spin .7s linear infinite;
+}
+:root[data-theme="light"] .page-loader-spinner{
+  border-color: rgba(10,12,18,.20);
+  border-top-color: rgba(10,12,18,.72);
+}
+a{color:inherit}
+button,input{font:inherit}
+[hidden]{display:none !important;}
+
+.container{ width:min(1080px, calc(100% - 32px)); margin:0 auto; }
+
+/* Skip link */
+.skip-link{
+  position:absolute; left:10px; top:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  background: rgba(0,0,0,.75);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.92);
+  text-decoration:none;
+  transform: translateY(-140%);
+  transition: transform .15s ease;
+  z-index: 2000;
+}
+.skip-link:focus-visible{ transform: translateY(0); outline:none; box-shadow: 0 0 0 4px var(--focus); }
+:root[data-theme="light"] .skip-link{ background: rgba(255,255,255,.92); border-color: rgba(10,12,18,.16); color: rgba(10,12,18,.92); }
+
+/* ========== Header ========== */
+.app-header{
+  position:sticky; top:0; z-index:50;
+  backdrop-filter: blur(14px);
+  background: rgba(5,6,10,.55);
+  border-bottom: 1px solid var(--stroke);
+}
+:root[data-theme="light"] .app-header{ background: rgba(255,255,255,.72); }
+
+.app-header-inner{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 14px 0;
+}
+.brand{
+  display:flex; align-items:center; gap:12px;
+  text-decoration:none;
+}
+.brand-badge{
+  width:34px; height:34px; border-radius:12px;
+  background: linear-gradient(135deg, rgba(255,106,42,.95), rgba(255,61,127,.85));
+  box-shadow: 0 14px 40px rgba(255,106,42,.18);
+  display:flex; align-items:center; justify-content:center;
+}
+.brand-badge svg{ width:18px; height:18px; fill: rgba(10,12,18,.92); }
+.brand-text{ display:flex; flex-direction:column; line-height:1.1; }
+.brand-title{ font-weight:800; letter-spacing:.2px; }
+.brand-sub{ font-size:12px; color: var(--muted); margin-top:3px; }
+
+.header-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* Buttons */
+@keyframes apollo-btn-bounce{
+  0%{ transform: translateY(0) scale(1); }
+  55%{ transform: translateY(-2px) scale(1.02); }
+  100%{ transform: translateY(-1px) scale(1); }
+}
+
+.btn{
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  will-change: transform;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), border-color .12s ease, background .12s ease;
+}
+.btn:hover{
+  text-decoration:none;
+  border-color: var(--stroke2);
+  background: rgba(255,255,255,.07);
+  animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both;
+}
+:root[data-theme="light"] .btn:hover{
+  text-decoration:none;
+  background: rgba(10,12,18,.04);
+}
+.btn:active{
+  animation: none;
+  transform: translateY(0) scale(.98);
+}
+.btn:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--focus); }
+
+
+.btn-primary{
+  background: linear-gradient(135deg, rgba(255,106,42,.96), rgba(255,61,127,.78));
+  border-color: rgba(255,106,42,.45);
+  color: rgba(10,12,18,.92);
+}
+.btn-primary:hover{ filter: brightness(1.02); border-color: rgba(255,106,42,.55); }
+
+.btn-print{
+  background: rgba(255,106,42,.92);
+  border-color: rgba(255,106,42,.55);
+  color: #ffffff;
+}
+.btn-print:hover{ filter: brightness(1.02); }
+
+/* ========== Menus (Editor) ========== */
+.menu{ position:relative; }
+.menu-trigger{ padding: 10px 12px; }
+.menu-panel{
+  position:absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 320px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: rgba(14,16,24,.96);
+  box-shadow: var(--shadow);
+  padding: 10px;
+
+  /* Allow tall menus to remain usable on small screens */
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+
+  /* Motion: open/close animation is driven by JS toggling .open/.closing */
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top right;
+  transition: opacity .14s ease, transform .14s ease;
+  will-change: transform, opacity;
+}
+.menu-panel.open{ opacity: 1; transform: translateY(0) scale(1); }
+.menu-panel.closing{ opacity: 0; transform: translateY(-6px) scale(.98); }
+:root[data-theme="light"] .menu-panel{ background: rgba(255,255,255,.98); }
+
+.menu-label{
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .2px;
+  color: var(--muted);
+  padding: 6px 10px 4px;
+  margin-top: -2px;
+  user-select:none;
+}
+.menu-sep{ height:1px; background: rgba(255,255,255,.12); margin: 8px 0; }
+:root[data-theme="light"] .menu-sep{ background: rgba(10,12,18,.14); }
+
+.menu-item{
+  width:100%;
+  text-align:left;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor:pointer;
+  will-change: transform;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), background .12s ease, border-color .12s ease;
+}
+.menu-item:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both; }
+:root[data-theme="light"] .menu-item:hover{ background: rgba(10,12,18,.04); border-color: rgba(10,12,18,.08); }
+.menu-item:active{ animation:none; transform: translateY(0) scale(.99); }
+
+.menu-item-title{ font-weight:650; font-size: 13px; }
+.menu-item-desc{ font-size: 12px; margin-top: 3px; color: var(--muted); }
+
+/* ========== Panels/Cards ========== */
+.panel{
+  margin: 22px auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,.04);
+  box-shadow: var(--shadow);
+  overflow:hidden;
+}
+:root[data-theme="light"] .panel{ background: rgba(255,255,255,.86); }
+
+/* Documents page: intentionally different look (card grid + accent top bar) */
+.docs-hero{ padding: 26px 0 10px; }
+.docs-title{ font-size: 26px; font-weight: 850; letter-spacing: .2px; margin:0; }
+.docs-subtitle{ margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+
+.docs-grid{
+  display:grid;
+  grid-template-columns: repeat( auto-fill, minmax(260px, 1fr) );
+  gap: 14px;
+  padding: 16px 0 26px;
+}
+.doc-card{
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background:
+    linear-gradient(90deg, rgba(255,106,42,.95), rgba(255,61,127,.75)) 0 0 / 100% 4px no-repeat,
+    var(--panel);
+  padding: 14px;
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  position: relative;
+}
+.doc-card::before{
+  content: none;
+}
+:root[data-theme="light"] .doc-card{
+  background:
+    linear-gradient(90deg, rgba(255,106,42,.95), rgba(255,61,127,.75)) 0 0 / 100% 4px no-repeat,
+    rgba(10,12,18,.03);
+}
+
+.doc-title{
+  font-weight: 800;
+  letter-spacing: .2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Document icon (non-editable): placed before document titles via markup.
+   NOTE: The previous mask-based pseudo-element approach can be unreliable depending on
+   browser/print/Shield settings. Using an <img> ensures the icon always renders.
+*/
+.doc-icon{
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  opacity: .74;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  display: block;
+  filter: invert(1) brightness(1.05);
+}
+:root[data-theme="light"] .doc-icon{
+  opacity: .62;
+  filter: none;
+}
+
+.doc-title-text{ flex: 0 1 auto; }
+
+.doc-title .doc-title-input{ flex: 1 1 auto; }
+.doc-meta{ color: var(--muted); font-size: 12px; }
+.doc-actions{ display:flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.doc-actions .btn{ padding: 9px 10px; border-radius: 12px; }
+
+.empty{
+  border: 1px dashed var(--stroke);
+  border-radius: 16px;
+  padding: 16px;
+  color: var(--muted);
+  background: rgba(255,255,255,.03);
+}
+
+.card-new{
+  border-style:dashed;
+}
+.card-new .doc-title{ display:flex; align-items:center; gap:10px; }
+.card-new .pill{
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,106,42,.45);
+  background: rgba(255,106,42,.10);
+  color: var(--text);
+}
+
+/* ========== Editor layout ========== */
+.editor-wrap{ padding: 18px 0 28px; }
+
+/* Screen reader only (accessible labels without visual clutter) */
+.sr-only{
+  position:absolute !important;
+  width:1px; height:1px;
+  padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0);
+  white-space:nowrap; border:0;
+}
+
+/* Sticky document bar (name + tools) — stays below the navbar */
+.docbar{
+  position: sticky;
+  top: var(--app-header-h, 64px);
+  z-index: 45;
+  margin-top: 12px;
+}
+.docbar-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background: rgba(0,0,0,.10);
+  backdrop-filter: blur(10px);
+}
+:root[data-theme="light"] .docbar-inner{ background: rgba(10,12,18,.03); }
+
+.docbar-left{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.docbar-left #docTitle{
+  flex: 1 1 auto;
+  min-width: 180px;
+  max-width: 520px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.14);
+  color: var(--text);
+  padding: 8px 10px;
+  height: 36px;
+  outline: none;
+}
+:root[data-theme="light"] .docbar-left #docTitle{ background: rgba(10,12,18,.04); }
+.docbar-left #docTitle:focus{ box-shadow: 0 0 0 4px var(--focus); border-color: rgba(255,106,42,.45); }
+
+/* Make status compact inside the sticky bar */
+.docbar-left .status{
+  min-width: unset;
+  padding: 8px 10px;
+  font-size: 12px;
+  height: 36px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  white-space: nowrap;
+}
+
+.docbar-actions{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px){
+  .docbar-inner{
+    flex-wrap: wrap;
+  }
+  .docbar-left{
+    width: 100%;
+  }
+  .docbar-actions{
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+
+
+/* Sticky editor toolbar — stays below the document bar */
+.toolstrip{
+  position: sticky;
+  top: calc(var(--app-header-h, 64px) + 12px + var(--docbar-h, 64px));
+  z-index: 44;
+  margin-top: 10px;
+}
+.toolstrip-inner{
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.10);
+  backdrop-filter: blur(10px);
+  overflow: visible;
+}
+:root[data-theme="light"] .toolstrip-inner{ background: rgba(10,12,18,.03); }
+
+/* Reduce spacing between toolbar and the editor panel */
+.editor-wrap .panel{ margin-top: 12px; }
+
+/* Quill toolbar lives in the sticky toolstrip */
+.toolstrip #toolbar{
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+}
+
+/* Compact wordcount under the toolbar (when enabled) */
+.toolstrip .wordcount{
+  padding: 0 12px 10px;
+}
+.editor-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 14px;
+  padding: 10px 18px 10px;
+}
+.field{ display:flex; flex-direction:column; gap: 6px; }
+.field label{ font-size: 12px; color: var(--muted); }
+.field input{
+  width: min(520px, 100%);
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.14);
+  color: var(--text);
+  padding: 10px 12px;
+  outline:none;
+}
+:root[data-theme="light"] .field input{ background: rgba(10,12,18,.04); }
+.field input:focus{ box-shadow: 0 0 0 4px var(--focus); border-color: rgba(255,106,42,.45); }
+
+.status{
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  padding: 10px 12px;
+  font-size: 13px;
+  min-width: 180px;
+  text-align:center;
+  background: rgba(0,0,0,.14);
+}
+.status--warn{ border-color: var(--warn); background: rgba(255,183,0,.08); }
+.status--ok{ border-color: var(--ok); background: rgba(34,197,94,.08); }
+.status--err{ border-color: var(--err); background: rgba(239,68,68,.08); }
+
+:root[data-theme="light"] .status{ background: rgba(10,12,18,.03); color: rgba(10,12,18,.86); }
+:root[data-theme="light"] .status--warn{ background: rgba(255,183,0,.20); color: rgba(10,12,18,.92); }
+:root[data-theme="light"] .status--ok{ background: rgba(34,197,94,.18); color: rgba(10,12,18,.92); }
+:root[data-theme="light"] .status--err{ background: rgba(239,68,68,.18); color: rgba(10,12,18,.92); }
+
+.wordcount{ padding: 0 18px 12px; color: var(--muted); font-size: 12px; }
+
+#toolbar{
+  padding: 8px 12px;
+  border-top: 1px solid var(--stroke);
+  border-bottom: 1px solid var(--stroke);
+  background: rgba(0,0,0,.10);
+}
+:root[data-theme="light"] #toolbar{ background: rgba(10,12,18,.03); }
+
+/* Quill editor font defaults */
+.ql-container{ border: none !important; font-family: "Roboto", system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  height: auto;
+}
+.ql-editor{ min-height: 520px; padding: 18px; font-size: 16px; line-height:1.55; height: auto; overflow: visible; }
+
+/* Page break guides (Letter size) — on-screen only */
+.ql-editor.apollo-page-guides{
+  /* Typical Letter: 11in height. We assume 1in margins -> 9in content height. */
+  --apollo-letter-content-height: 9in;
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent calc(var(--apollo-letter-content-height) - 1px),
+      rgba(255,255,255,.10) calc(var(--apollo-letter-content-height) - 1px),
+      rgba(255,255,255,.10) var(--apollo-letter-content-height)
+    );
+  background-size: 100% var(--apollo-letter-content-height);
+  background-repeat: repeat;
+  /* Make the guides behave like document breaks: they should scroll with content. */
+  background-origin: content-box;
+  background-clip: content-box;
+  background-position: 0 0;
+}
+:root[data-theme="light"] .ql-editor.apollo-page-guides{
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent calc(var(--apollo-letter-content-height) - 1px),
+      rgba(10,12,18,.14) calc(var(--apollo-letter-content-height) - 1px),
+      rgba(10,12,18,.14) var(--apollo-letter-content-height)
+    );
+}
+
+.ql-toolbar.ql-snow{ border: none !important; }
+
+/* Quill toolbar interactions — match site button motion */
+.ql-toolbar button,
+.ql-toolbar .ql-picker-label{
+  will-change: transform;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), background .12s ease;
+}
+.ql-toolbar button:hover,
+.ql-toolbar .ql-picker-label:hover{
+  animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both;
+}
+.ql-toolbar button:active,
+.ql-toolbar .ql-picker-label:active{
+  animation: none;
+  transform: translateY(0) scale(.98);
+}
+
+
+/* Quill icons contrast in dark */
+:root:not([data-theme="light"]) .ql-snow .ql-stroke{ stroke: rgba(255,255,255,.86); }
+:root:not([data-theme="light"]) .ql-snow .ql-fill{ fill: rgba(255,255,255,.86); }
+:root:not([data-theme="light"]) .ql-snow .ql-picker{ color: rgba(255,255,255,.86); }
+
+/* Loading overlay */
+.loading{
+  position: fixed;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(10px);
+  z-index: 2000;
+}
+.loading-card{
+  border-radius: 18px;
+  border: 1px solid var(--stroke);
+  background: rgba(14,16,24,.96);
+  box-shadow: var(--shadow);
+  padding: 18px 16px;
+  width: min(360px, calc(100% - 34px));
+}
+:root[data-theme="light"] .loading-card{ background: rgba(255,255,255,.96); }
+.loading-title{ font-weight: 800; }
+.loading-sub{ margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .btn, .menu-panel, .panel, .doc-card, .skip-link{ transition:none !important; }
+}
+
+
+/* ========== Footer ========== */
+.site-footer{
+  padding: 18px 0 26px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.footer-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  border-top: 1px solid var(--stroke);
+  padding-top: 14px;
+}
+.footer-brand{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+.footer-dot{
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255,106,42,.95), rgba(255,61,127,.75));
+  opacity: .9;
+}
+.footer-meta{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content:flex-end;
+  text-align:right;
+}
+.footer-pill{
+  border: 1px solid var(--stroke);
+  background: var(--panel2);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+:root[data-theme="light"] .footer-pill{
+  background: rgba(10,12,18,.03);
+}
+
+
+/* ========== Print: editor content only ========== */
+@media print{
+  @page{
+    size: Letter;
+    margin: 1in;
+  }
+
+  /* Remove decorative background */
+  body::before{ display:none !important; }
+  html::before{ display:none !important; }
+  body{
+    background: #ffffff !important;
+    color: #0a0c12 !important;
+  }
+  html, body{
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+
+  /* Hide UI chrome */
+  .app-header,
+  .site-footer,
+  .skip-link,
+  .loading,
+  .docbar,
+  .toolstrip,
+  #toolbar,
+  .editor-top,
+  .wordcount{
+    display:none !important;
+  }
+
+  /* Strip card styling and margins */
+  .container{ width: 100% !important; margin: 0 !important; }
+  .panel{
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure Quill content prints cleanly */
+  .ql-container{
+    border: none !important;
+    height: auto !important;
+  }
+
+  .ql-editor{
+    padding: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    font-size: 12pt !important;
+    line-height: 1.45 !important;
+    color: #0a0c12 !important;
+    background: transparent !important;
+  }
+  .ql-editor.apollo-page-guides{ background: none !important; }
+
+  /* Ensure editor container doesn't clip (Quill defaults can be scrollable) */
+  #editor,
+  .ql-container,
+  .ql-editor{
+    overflow: visible !important;
+  }
+
+  /* Avoid printing menus/panels if open */
+  .menu-panel{ display:none !important; }
+}
+
+body{ overflow-x: hidden; }
+
+
+/* ========== Responsive adjustments ========== */
+.doc-title,
+.menu-item-title,
+.menu-item-desc,
+.status{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.menu-panel{
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+@media (max-width: 720px){
+  .app-header-inner{ align-items:flex-start; gap: 10px; }
+  .header-actions{ justify-content:flex-end; }
+
+  .editor-top{
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 14px 0;
+  }
+
+  .field input{
+    width: 100%;
+  }
+
+  .status{
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+
+  #toolbar{
+    padding: 8px 10px;
+  }
+
+  .menu-panel{
+    right: 0;
+    left: auto;
+    min-width: 260px;
+  }
+
+  .btn{ padding: 10px 10px; }
+
+  /* Mobile: icon-only for Home / Print / Options (settings menu) */
+  .btn-home .btn-text,
+  .btn-print .btn-text,
+  .btn-archive .btn-text{ display: none; }
+
+  .btn-home,
+  .btn-print{ gap: 0; padding-inline: 10px; }
+
+  .menu[data-menu="settings"] .menu-trigger .trigger-text,
+  .menu[data-menu="settings"] .menu-trigger .caret{ display: none; }
+
+  .menu[data-menu="settings"] .menu-trigger{ gap: 0; padding-inline: 10px; }
+
+  /* Mobile: icon-only for Info (index page) */
+  .menu[data-menu="info"] .menu-trigger .trigger-text,
+  .menu[data-menu="info"] .menu-trigger .caret{ display: none; }
+  .menu[data-menu="info"] .menu-trigger{ gap: 0; padding-inline: 10px; }
+
+  .container{ width: calc(100% - 24px); }
+}
+
+
+/* ========== Icon buttons (Documents list) ========== */
+.btn-icon{
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content:center;
+}
+.btn-icon svg{
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+/* ========== Documents list view mode ========== */
+.docs-list{
+  display:flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0 26px;
+}
+.docs-list .doc-card{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "title actions"
+    "meta actions";
+  align-items:center;
+  gap: 8px 14px;
+}
+.docs-list .doc-title{ grid-area: title; margin-top: 2px; }
+.docs-list .doc-meta{ grid-area: meta; }
+.docs-list .doc-actions{ grid-area: actions; margin-top: 0; justify-content:flex-end; }
+.docs-list .doc-card::before{ height: 3px; opacity: .7; }
+
+
+/* ========== Wallpaper layer (fixed on html; avoids cut-off) ========== */
+html{
+  background: var(--bg0);
+  position: relative;
+  overflow-x: hidden;
+}
+body{
+  background: transparent;
+  overflow-x: hidden;
+  min-height: 100%;
+}
+html::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 700px at 12% 20%, rgba(255,106,42,.18), transparent 60%),
+    radial-gradient(900px 600px at 88% 24%, rgba(255,61,127,.14), transparent 58%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+
+
+/* ========== Inline rename (Documents list) ========== */
+.doc-title[data-docid]{
+  cursor: text;
+}
+.doc-title[data-docid]:hover{
+  text-decoration: underline;
+  text-decoration-color: rgba(255,255,255,.25);
+}
+:root[data-theme="light"] .doc-title[data-docid]:hover{
+  text-decoration-color: rgba(10,12,18,.22);
+}
+
+.doc-title-input{
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.14);
+  color: var(--text);
+  padding: 6px 8px;
+  outline: none;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+:root[data-theme="light"] .doc-title-input{
+  background: rgba(10,12,18,.04);
+}
+.doc-title-input:focus{
+  box-shadow: 0 0 0 4px var(--focus);
+  border-color: rgba(255,106,42,.45);
+}
+
+
+/* ========== Danger icon button (borderless, red) ========== */
+.btn-icon-danger{
+  border: none !important;
+  background: transparent !important;
+  color: rgba(239,68,68,.92);
+}
+.btn-icon-danger:hover{
+  background: rgba(239,68,68,.12) !important;
+}
+:root[data-theme="light"] .btn-icon-danger{
+  color: rgba(220,38,38,.92);
+}
+:root[data-theme="light"] .btn-icon-danger:hover{
+  background: rgba(220,38,38,.10) !important;
+}
+
+.pill-muted{
+  border: 1px solid var(--stroke);
+  background: var(--panel2);
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+
+/* ========== Dark mode: ensure button text stays readable on hover ========== */
+:root[data-theme="dark"] .btn:hover,
+:root[data-theme="dark"] .btn:active{
+  color: #ffffff !important;
+}
+:root[data-theme="dark"] .btn:focus-visible{
+  color: #ffffff !important;
+}
+
+
+
+
+
+/* ========== Quill pickers: keep Snow defaults (clean text) with site colors ========== */
+/* Keep labels unboxed and minimal (no pill background, no borders). */
+.ql-snow .ql-picker-label{
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--text) !important;
+}
+
+/* Light theme: keep labels readable on the lighter toolbar */
+:root[data-theme="light"] .ql-snow .ql-picker-label{
+  color: rgba(10,12,18,.92) !important;
+}
+
+/* Keep a small gap between adjacent pickers */
+.ql-snow .ql-formats .ql-picker + .ql-picker{
+  margin-left: 10px;
+}
+
+/* Dropdown styling: use site surfaces, but keep Quill's icon sizing */
+.ql-snow .ql-picker-options{
+  background: var(--bg1) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 14px !important;
+  top: calc(100% + 10px) !important; /* breathing room below picker */
+  padding: 6px !important;
+  box-shadow: 0 14px 40px rgba(0,0,0,.30);
+}
+.ql-snow .ql-picker-options .ql-picker-item{
+  border-radius: 10px !important;
+  color: var(--text) !important;
+}
+.ql-snow .ql-picker-options .ql-picker-item:hover,
+.ql-snow .ql-picker-options .ql-picker-item.ql-selected{
+  background: var(--panel) !important;
+}
+
+/* Ensure the default picker text/icons inherit the theme color */
+.ql-snow .ql-picker-label::before,
+.ql-snow .ql-picker-options .ql-picker-item::before{
+  color: var(--text) !important;
+}
+
+/* ========== Toast notifications ========== */
+.toast{
+  position: fixed;
+  top: 54px; /* below header */
+  left: 50%;
+  width: min(720px, calc(100vw - 24px));
+  z-index: 50;
+
+  /* Motion: JS toggles .toast--show/.toast--hide */
+  opacity: 0;
+  transform: translate(-50%, -22px);
+  transition: opacity .18s ease, transform .18s ease;
+  will-change: transform, opacity;
+  pointer-events: none; /* avoid blocking header interactions */
+}
+.toast.toast--show{ opacity: 1; transform: translate(-50%, 0); }
+.toast.toast--hide{ opacity: 0; transform: translate(-50%, -22px); }
+
+.toast[hidden]{ display:none !important; }
+.toast-inner{
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--panel);
+  box-shadow: 0 16px 50px rgba(0,0,0,.35);
+}
+.toast-danger .toast-inner{
+  border-color: rgba(239,68,68,.35);
+  background: rgba(239,68,68,.10);
+}
+.toast-text{
+  color: var(--text);
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast-text strong{
+  font-weight: 800;
+}
+
+
+/* ========== Toast timer ========== */
+.toast-inner{ position: relative; }
+.toast-timer{
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  padding-left: 10px;
+}
+.toast-danger .toast-timer{
+  color: rgba(255,255,255,.82);
+}
+:root[data-theme="light"] .toast-danger .toast-timer{
+  color: rgba(10,12,18,.72);
+}
+
+
+/* ========== Archive header button (red gradient) ========== */
+.btn-archive{
+  border: 1px solid rgba(239,68,68,.35) !important;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, rgba(239,68,68,.92), rgba(244,63,94,.68)) !important;
+}
+.btn-archive:hover{
+  background: linear-gradient(135deg, rgba(239,68,68,1), rgba(244,63,94,.80)) !important;
+}
+.btn-archive:active{
+  transform: translateY(1px);
+}
+
+
+/* ========== Archive page: orange document accents ========== */
+.archive-page .doc-card{
+  background:
+    linear-gradient(135deg, rgba(255,106,42,.95), rgba(255,168,76,.65)) 0 0 / 100% 4px no-repeat,
+    var(--panel);
+}
+:root[data-theme="light"] .archive-page .doc-card{
+  background:
+    linear-gradient(135deg, rgba(255,106,42,.95), rgba(255,168,76,.65)) 0 0 / 100% 4px no-repeat,
+    rgba(10,12,18,.03);
+}
+.archive-page .doc-title{
+  color: var(--text);
+}
+
+/* ========== Settings gear icon ========== */
+.icon-gear{
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+.caret{
+  margin-left: 2px;
+  opacity: .9;
+}
+
+/* ========== Links styled as buttons: remove underline ========== */
+.btn{ text-decoration:none; }
+.btn:hover{ text-decoration:none; }
+
+
+/* ========== Options trigger layout ========== */
+.menu-trigger{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* ========== Quill toolbar icon sizing (restore alignment icons) ========== */
+.ql-snow.ql-toolbar button,
+.ql-snow .ql-toolbar button{
+  width: 34px;
+  height: 34px;
+}
+.ql-snow.ql-toolbar button svg,
+.ql-snow .ql-toolbar button svg{
+  width: 18px;
+  height: 18px;
+}
+
+/* ========== Quill toolbar motion ========== */
+.ql-snow.ql-toolbar button:hover,
+.ql-snow .ql-toolbar button:hover{
+  animation: apollo-btn-bounce .18s cubic-bezier(.2,.9,.2,1) both;
+}
+.ql-snow.ql-toolbar button:active,
+.ql-snow .ql-toolbar button:active{
+  animation: none;
+  transform: translateY(0) scale(.98);
+}
+
+/* Quill alignment picker motion — match toolbar icon bounce */
+.ql-snow .ql-picker.ql-align .ql-picker-label{
+  will-change: transform;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1);
+}
+.ql-snow .ql-picker.ql-align .ql-picker-label:hover{
+  animation: apollo-btn-bounce .18s cubic-bezier(.2,.9,.2,1) both;
+}
+.ql-snow .ql-picker.ql-align .ql-picker-label:active{
+  animation: none;
+  transform: translateY(0) scale(.98);
+}
+/* Slightly boost the collapsed alignment icon (dropdown icons remain unchanged). */
+.ql-snow .ql-picker.ql-align .ql-picker-label::before{
+  transform: scale(1.12);
+  transform-origin: center;
+  display: inline-block;
+}
+
+
+
+
+/* ========== Options icon (PNG) ========== */
+.icon-gear-img{
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+}
+
+
+/* ========== Apollo modal (Archive confirmations) ========== */
+.modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+
+  /* Motion: JS toggles .is-open/.is-closing */
+  opacity: 0;
+  transition: opacity .18s ease;
+  will-change: opacity;
+}
+.modal-backdrop.is-open{ opacity: 1; }
+.modal-backdrop.is-closing{ opacity: 0; }
+
+.modal-backdrop[hidden]{
+  display: none !important;
+}
+
+.modal{
+  width: 520px;
+  max-width: 96vw;
+  background: rgba(20,22,32,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.55);
+  backdrop-filter: blur(10px);
+
+  opacity: 0;
+  transform: translateY(12px) scale(.985);
+  transition: opacity .18s ease, transform .18s cubic-bezier(.2,.9,.2,1);
+  will-change: transform, opacity;
+}
+.modal-backdrop.is-open .modal{ opacity: 1; transform: translateY(0) scale(1); }
+.modal-backdrop.is-closing .modal{ opacity: 0; transform: translateY(12px) scale(.985); }
+
+:root[data-theme="light"] .modal{
+  background: rgba(255,255,255,.92);
+  border-color: rgba(10,12,18,.14);
+}
+.modal-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+.modal-title{
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.icon-btn{
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), border-color .12s ease, background .12s ease;
+}
+.icon-btn:hover{
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.10);
+  animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both;
+}
+.icon-btn:active{
+  animation:none;
+  transform: translateY(0) scale(.97);
+}
+:root[data-theme="light"] .icon-btn{
+  border-color: rgba(10,12,18,.14);
+  background: rgba(10,12,18,.04);
+}
+:root[data-theme="light"] .icon-btn:hover{ border-color: rgba(10,12,18,.18); background: rgba(10,12,18,.06); animation: apollo-btn-bounce .22s cubic-bezier(.2,.9,.2,1) both; }
+.modal-body{ padding: 0 16px 14px; }
+.modal-text{ margin: 0; line-height: 1.5; }
+.modal-sub{ display:block; margin-top: 6px; opacity: .85; }
+.modal-actions{
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
+}
+.btn-danger{
+  border-color: rgba(255,90,120,.55) !important;
+  background: linear-gradient(180deg, rgba(255,70,100,.96), rgba(190,30,60,.96)) !important;
+  color: #fff !important;
+}
+
+/* Links inside menus should look like menu items */
+.menu-link{ text-decoration: none; }
+.menu-link:hover{ text-decoration: none; }
+
+/* Options icon visibility (svgrepo SVG is typically dark) */
+.icon-gear-img{
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  filter: invert(1);
+  opacity: .92;
+}
+:root[data-theme="light"] .icon-gear-img{
+  filter: none;
+  opacity: .9;
+}
+.trigger-text{ display: inline-block; }
+
+/* Ensure menu trigger content aligns nicely */
+.menu-trigger{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* ========== Changelog page ========== */
+.changelog-feed{
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.changelog-entry{
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  border-radius: 14px;
+  padding: 14px 14px 10px;
+}
+:root[data-theme="light"] .changelog-entry{
+  border-color: rgba(10,12,18,.12);
+  background: rgba(10,12,18,.03);
+}
+.changelog-head{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.changelog-version{
+  font-family: "Inter", sans-serif;
+  font-weight: 800;
+}
+.changelog-date{
+  opacity: .8;
+  font-size: 13px;
+}
+.changelog-summary{
+  margin-top: 6px;
+  opacity: .92;
+}
+.changelog-sections{ margin-top: 10px; display: grid; gap: 10px; }
+.changelog-section-title{
+  font-weight: 700;
+  opacity: .92;
+  margin-bottom: 6px;
+}
+.changelog-list{
+  margin: 0;
+  padding-left: 18px;
+}
+
+
+/* ========== Home button icon ========== */
+.btn-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.icon-home-img {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  filter: invert(1);
+  opacity: .92;
+}
+:root[data-theme="light"] .icon-home-img {
+  filter: none;
+  opacity: .9;
+}
+
+
+/* ========== Inline button icon (Info) ========== */
+.icon-info-img{
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  filter: invert(1);
+  opacity: .92;
+}
+:root[data-theme="light"] .icon-info-img{
+  filter: none;
+  opacity: .9;
+}
+
+/* ========== Inline button icon (Trash) ========== */
+.icon-trash-img{
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  filter: invert(1);
+  opacity: .92;
+}
+:root[data-theme="light"] .icon-trash-img{
+  filter: none;
+  opacity: .9;
+}
+
+/* ========== Inline button icon (Print) ========== */
+.icon-print-img{
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  filter: invert(1);
+  opacity: .92;
+}
+:root[data-theme="light"] .icon-print-img{
+  filter: none;
+  opacity: .9;
+}
+
+/* Force white icons for specific accent buttons in Light theme */
+:root[data-theme="light"] .btn-archive .icon-trash-img{
+  filter: invert(1) !important;
+  opacity: .92;
+}
+:root[data-theme="light"] .btn-print .icon-print-img{
+  filter: invert(1) !important;
+  opacity: .92;
+}
+
+/* Light theme: Print button hover should switch to black text + black icon */
+:root[data-theme="light"] .btn-print:hover{
+  color: rgba(10,12,18,.92) !important;
+}
+:root[data-theme="light"] .btn-print:hover .icon-print-img{
+  filter: none !important;
+  opacity: .92;
+}
+
+
+
+
+/* ========== Menu link full row hover (Changelog) ========== */
+.menu-item.menu-link{
+  display: block;
+  box-sizing: border-box;
+}
+.menu-item.menu-link:hover{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.10);
+}
+:root[data-theme="light"] .menu-item.menu-link:hover{
+  background: rgba(10,12,18,.06);
+  border-color: rgba(10,12,18,.10);
+}
+
+
+/* ========== Changelog timeline ========== */
+.changelog-panel{
+  padding: 18px;
+}
+.changelog-panel .panel-header{
+  padding: 0 2px 8px;
+}
+.changelog-timeline{
+  position: relative;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Changelog grid mode: compact cards in a responsive grid */
+.changelog-timeline.is-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.changelog-timeline.is-grid .changelog-row{
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+.changelog-timeline.is-grid .changelog-actions{
+  justify-content: flex-start;
+}
+.changelog-row{
+  display: grid;
+  grid-template-columns: 220px 1fr auto;
+  gap: 14px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+}
+:root[data-theme="light"] .changelog-row{
+  border-color: rgba(10,12,18,.12);
+  background: rgba(10,12,18,.03);
+}
+.changelog-left{
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.changelog-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  background: rgba(255,120,90,.95);
+  box-shadow: 0 0 0 4px rgba(255,120,90,.18);
+  flex: 0 0 auto;
+}
+.changelog-left-meta{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.changelog-version{
+  font-family: "Inter", sans-serif;
+  font-weight: 800;
+}
+.changelog-date{
+  font-size: 13px;
+  opacity: .8;
+}
+.changelog-row-title{
+  font-weight: 750;
+  margin-top: 1px;
+}
+.changelog-row-desc{
+  margin-top: 6px;
+  opacity: .92;
+}
+.changelog-actions{
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-small{
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* Modal wide variant for changelog details */
+.modal-wide{
+  width: 720px;
+  max-width: 96vw;
+}
+.changelog-modal-meta{
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.changelog-meta-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.changelog-meta-pill{
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  font-weight: 700;
+}
+:root[data-theme="light"] .changelog-meta-pill{
+  border-color: rgba(10,12,18,.14);
+  background: rgba(10,12,18,.04);
+}
+.changelog-meta-date{ opacity: .85; font-size: 13px; }
+.changelog-meta-summary{ opacity: .92; }
+
+
+/* ========== Changelog responsive ========== */
+@media (max-width: 720px){
+  .changelog-row{
+    grid-template-columns: 1fr;
+  }
+  .changelog-actions{
+    justify-content: flex-start;
+  }
+}
+
+
+/* ========== Save As submenu (editor Options) ========== */
+.menu-item-caret{
+  margin-left: auto;
+  opacity: .85;
+  font-size: 14px;
+}
+.menu-subpanel{
+  /*
+    Save As is a nested submenu inside the Settings menu panel.
+    To avoid the “snap” collapse at the end of the close animation,
+    we animate both visibility *and* layout (height/padding/margins)
+    while it closes.
+
+    JS toggles `.open` / `.closing` and sets [hidden] after the motion.
+  */
+
+  /* Closed state (baseline) */
+  margin: 0 0 0 10px;
+  padding: 0;
+  max-height: 0;
+  overflow: hidden;
+
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+
+  opacity: 0;
+  transform: translateY(-4px) scale(.99);
+  transition:
+    opacity .16s ease,
+    transform .16s ease,
+    max-height .18s ease,
+    margin .18s ease,
+    padding .18s ease,
+    border-color .18s ease,
+    background-color .18s ease;
+  will-change: transform, opacity, max-height;
+}
+
+/* Open state */
+.menu-subpanel.open{
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  max-height: 420px;
+  margin: 6px 0 10px 10px;
+  padding: 6px;
+  border-color: rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+}
+
+/* Explicit closing state (kept for clarity and reduced-motion overrides) */
+.menu-subpanel.closing{
+  opacity: 0;
+  transform: translateY(-4px) scale(.99);
+  max-height: 0;
+  margin: 0 0 0 10px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+:root[data-theme="light"] .menu-subpanel.open{
+  border-color: rgba(10,12,18,.12);
+  background: rgba(10,12,18,.03);
+}
+.menu-item--sub{
+  border-radius: 10px;
+}
+.menu-item--sub .menu-item-title{
+  font-weight: 700;
+}
+
+
+/* ========== Reduced motion ========== */
+@media (prefers-reduced-motion: reduce){
+  .btn, .menu-item, .icon-btn,
+  .ql-snow.ql-toolbar button, .ql-snow .ql-toolbar button{
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .menu-panel, .menu-subpanel,
+  .toast, .modal-backdrop, .modal,
+  .page-loader, .page-loader-spinner{
+    transition: none !important;
+    animation: none !important;
+  }
+}
