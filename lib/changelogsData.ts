@@ -17,6 +17,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.3',
+  date: '2025-12-22',
+  time: '2:57 PM PST',
+  title: 'Build fix: restore APP_NAME export',
+  summary: 'Restored the missing APP_NAME export in lib/version.ts that caused builds to fail when SiteFooter imported it.',
+  sections: [
+    {
+      title: 'Build',
+      items: [
+        'Added APP_NAME export to lib/version.ts and kept APP_VERSION export stable for server/client imports.',
+        'Bumped version constants to 3.1.3.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.2',
   date: '2025-12-22',
   time: '2:55 PM PST',
