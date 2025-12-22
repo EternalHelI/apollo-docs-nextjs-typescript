@@ -17,6 +17,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.2',
+  date: '2025-12-22',
+  time: '2:55 PM PST',
+  title: 'Build fix: Turbopack changelog string parsing',
+  summary: 'Fixed a TypeScript string quoting issue in the v3.1.1 changelog that caused Turbopack to fail during build.',
+  sections: [
+    {
+      title: 'Build',
+      items: [
+        'Escaped/normalized the “Couldn\'t save” changelog bullet so it no longer terminates a single-quoted TypeScript string.',
+        'No runtime behavior changes; this release only unblocks Next.js builds.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.1',
   date: '2025-12-22',
   time: '2:40 PM PST',
@@ -36,7 +52,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
       items: [
         'Implemented an autosave status flow with animated dots while typing (Autosaving., Autosaving.., Autosaving...).',
         'When a save completes, the status now shows an exact timestamp (Saved @ HH:MM AM/PM).',
-        'Added clear red error states for failed saves (e.g., “Couldn't save”).'
+        "Added clear red error states for failed saves (e.g., “Couldn't save”)."
       ]
     },
     {
