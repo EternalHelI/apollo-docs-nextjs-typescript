@@ -17,6 +17,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v2.0.3',
+  date: '2025-12-21',
+  time: '9:58 PM PST',
+  title: 'Fix: Next.js 15 build error + metadata warnings',
+  summary: 'Resolved a Next.js 15 prerender/build failure on /editor and removed unsupported metadata viewport configuration warnings.',
+  sections: [
+    {
+      title: 'Next.js App Router',
+      items: [
+        'Removed useSearchParams() from the /editor route by passing searchParams from the server page into a client component, eliminating the missing Suspense boundary prerender error.',
+        'Moved viewport configuration from metadata export to a dedicated viewport export in the root layout (Next.js 15+ compliant).' 
+      ]
+    }
+  ]
+},
+{
   version: 'v2.0.2',
   date: '2025-12-21',
   time: '9:28 PM PST',

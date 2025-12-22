@@ -1,13 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import '@/app/globals.css';
 
 export const metadata: Metadata = {
   title: 'Apollo Hub • Apollo Documents',
   description: 'Apollo Documents — manage your documents locally in your browser and open the editor when needed.',
-  viewport: { width: 'device-width', initialScale: 1 },
   icons: { icon: '/assets/gear-16.png' },
   other: { 'color-scheme': 'dark light' }
+};
+
+// Next.js 15+ expects viewport metadata to be exported separately.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1
 };
 
 export default function RootLayout(props: { children: React.ReactNode }) {
