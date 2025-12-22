@@ -17,6 +17,43 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.0',
+  date: '2025-12-22',
+  time: '12:54 AM PST',
+  title: 'UI polish + toast fix + legacy cleanup',
+  summary: 'Improved the editor UI density and page-break visuals, fixed toast animations, seeded new documents with an intro, and removed the deprecated Quill Delta compatibility layer.',
+  sections: [
+    {
+      title: 'Editor UX',
+      items: [
+        'Made the document bar more compact for naming/status and tightened spacing.',
+        'Improved on-screen page break guides with a small gap band + divider (Google Docs style).',
+        'Seeded every newly created document with an introductory message.',
+        'Fixed the status indicator to reliably exit “Loading…” once the editor hydrates.'
+      ]
+    },
+    {
+      title: 'Reliability',
+      items: [
+        'Fixed toast show/hide animations by aligning JS class toggles with the CSS (restores notifications on Home + Archive).'
+      ]
+    },
+    {
+      title: 'Storage',
+      items: [
+        'Removed legacy Quill Delta support and migration code; TipTap JSON storage is now the only supported format.'
+      ]
+    },
+    {
+      title: 'Assets',
+      items: [
+        'Updated the document/info SVG assets to the fixed-color versions.',
+        'Set the rocket icon as the site favicon via app/icon.svg.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.0.0',
   date: '2025-12-21',
   time: '11:55 PM PST',

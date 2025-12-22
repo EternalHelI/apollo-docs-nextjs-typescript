@@ -17,7 +17,7 @@ import { useDocsViewMode } from '@/lib/hooks/useDocsView';
 import { useThemeMode } from '@/lib/hooks/useTheme';
 import { useToast } from '@/lib/hooks/useToast';
 
-import { moveToArchive, openDocUrl, createDoc, migrateLegacyIfNeeded, purgeExpiredTrash, setDocTitle } from '@/lib/docsStore';
+import { moveToArchive, openDocUrl, createDoc, purgeExpiredTrash, setDocTitle } from '@/lib/docsStore';
 import { loadIndex } from '@/lib/storage';
 import { escapeHtml, fmtTime, safeText } from '@/lib/utils';
 
@@ -37,7 +37,6 @@ export default function Homepage() {
 
   const reload = useCallback(() => {
     purgeExpiredTrash();
-    migrateLegacyIfNeeded();
     const idx = loadIndex().slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     setDocs(idx);
   }, []);

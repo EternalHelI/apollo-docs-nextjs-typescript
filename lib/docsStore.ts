@@ -1,8 +1,26 @@
 import type { DocMeta, TrashItem } from '@/lib/types';
-import { getContentKey, getContentKeyV2, loadContentV2Raw, loadDeltaRaw, loadIndex, loadTrash, removeContentV2, removeDelta, saveIndex, saveTrash } from '@/lib/storage';
+import { getContentKeyV2, loadContentV2Raw, loadIndex, loadTrash, removeContentV2, saveContentV2Raw, saveIndex, saveTrash } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const DEFAULT_NEW_DOC_CONTENT = {
+  type: 'doc',
+  content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Welcome to Apollo Documents' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'This is a new document. Everything saves locally in your browser.' }] },
+    {
+      type: 'bulletList',
+      content: [
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Rename the document in the title bar.' }] }] },
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Use Options → Save As to export (PDF, DOCX, ODT).' }] }] },
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Move documents to Archive to recover them for 30 days.' }] }] }
+      ]
+    },
+    { type: 'paragraph', content: [{ type: 'text', text: 'Start writing below.' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '' }] }
+  ]
+} as const;
 
 export function ensureDocMeta(docId: string, fallbackTitle = 'Apollo Document'): DocMeta {
   const idx = loadIndex();
@@ -22,6 +40,15 @@ export function createDoc(title = 'Apollo Document'): DocMeta {
   const doc: DocMeta = { id, title, createdAt: Date.now(), updatedAt: Date.now() };
   idx.push(doc);
   saveIndex(idx);
+
+  // Seed brand-new documents with an introductory message.
+  try {
+    const existing = loadContentV2Raw(id);
+    if (!existing) saveContentV2Raw(id, JSON.stringify(DEFAULT_NEW_DOC_CONTENT));
+  } catch {
+    // ignore
+  }
+
   return doc;
 }
 
@@ -71,7 +98,6 @@ export function moveToArchive(docId: string): boolean {
   saveIndex(idx);
 
   const trash = loadTrash();
-  const delta = loadDeltaRaw(docId);
   const contentV2 = loadContentV2Raw(docId);
   const item: TrashItem = {
     id: doc.id,
@@ -79,11 +105,14 @@ export function moveToArchive(docId: string): boolean {
     createdAt: doc.createdAt || Date.now(),
     updatedAt: doc.updatedAt || Date.now(),
     deletedAt: Date.now(),
-    delta: delta ?? null,
     contentV2: contentV2 ?? null
   };
   trash.push(item);
   saveTrash(trash);
+
+  // Remove the content payload from the active document namespace now that it's in Archive.
+  // (The archive entry retains the snapshot for restoration.)
+  try { removeContentV2(docId); } catch {}
   return true;
 }
 
@@ -92,10 +121,9 @@ export function purgeExpiredTrash(): TrashItem[] {
   const now = Date.now();
   const kept = trash.filter(t => (t.deletedAt || now) + TRASH_RETENTION_MS > now);
   if (kept.length !== trash.length) {
-    // Remove deltas for items that expired.
+    // Remove content snapshots for items that expired.
     const expired = trash.filter(t => !kept.includes(t));
     expired.forEach(t => {
-      try { removeDelta(t.id); } catch {}
       try { removeContentV2(t.id); } catch {}
     });
     saveTrash(kept);
@@ -121,13 +149,7 @@ export function restoreFromArchive(id: string): boolean {
   saveIndex(idx);
 
   try {
-    // Prefer modern content snapshot when available.
-    if (item.contentV2) {
-      window.localStorage.setItem(getContentKeyV2(newId), item.contentV2);
-    } else if (item.delta) {
-      // Legacy snapshots (v1/v2): preserve under legacy key for best-effort migration.
-      window.localStorage.setItem(getContentKey(newId), item.delta);
-    }
+    if (item.contentV2) window.localStorage.setItem(getContentKeyV2(newId), item.contentV2);
   } catch {}
 
   trash.splice(trash.indexOf(item), 1);
@@ -142,38 +164,6 @@ export function permanentlyDeleteFromArchive(id: string): boolean {
 
   trash.splice(trash.indexOf(item), 1);
   saveTrash(trash);
-  removeDelta(id);
   removeContentV2(id);
   return true;
-}
-
-// Legacy keys (migration from earlier single-document builds)
-const LEGACY_DELTA_KEY = 'apollo_docs_draft_delta_v1';
-const LEGACY_TITLE_KEY = 'apollo_docs_draft_title_v1';
-
-/**
- * Migrates legacy single-document storage keys into the multi-document index.
- * Returns true if a migration happened.
- */
-export function migrateLegacyIfNeeded(): boolean {
-  if (typeof window === 'undefined') return false;
-  const idx = loadIndex();
-  if (idx.length) return false;
-
-  try {
-    const rawDelta = window.localStorage.getItem(LEGACY_DELTA_KEY);
-    const rawTitle = window.localStorage.getItem(LEGACY_TITLE_KEY);
-    if (!rawDelta) return false;
-
-    const doc = createDoc('Apollo Document');
-    if (rawTitle) {
-      const t = rawTitle.toString().trim().slice(0, 120);
-      if (t) updateDocMeta(doc.id, { title: t });
-    }
-
-    window.localStorage.setItem(getContentKey(doc.id), rawDelta);
-    return true;
-  } catch {
-    return false;
-  }
 }

@@ -40,11 +40,12 @@ export function createToast(opts: {
   const hide = () => {
     clearTimers();
     if (!toastEl) return;
-    toastEl.classList.remove('is-open');
-    toastEl.classList.add('is-closing');
+    // Match the CSS animation classes.
+    toastEl.classList.remove('toast--show');
+    toastEl.classList.add('toast--hide');
     window.setTimeout(() => {
       toastEl.hidden = true;
-      toastEl.classList.remove('is-closing');
+      toastEl.classList.remove('toast--hide');
       if (textEl) textEl.textContent = '';
     }, 200);
   };
@@ -60,8 +61,8 @@ export function createToast(opts: {
     setTimerText();
 
     toastEl.hidden = false;
-    toastEl.classList.remove('is-closing');
-    window.requestAnimationFrame(() => toastEl.classList.add('is-open'));
+    toastEl.classList.remove('toast--hide');
+    window.requestAnimationFrame(() => toastEl.classList.add('toast--show'));
 
     scheduleTick();
     hideTimeout = window.setTimeout(hide, remaining * 1000);

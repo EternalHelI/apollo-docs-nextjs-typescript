@@ -15,10 +15,8 @@ export interface TrashItem {
   createdAt: number;
   updatedAt: number;
   deletedAt: number;
-  /** Legacy v1/v2 editor content snapshot (Quill Delta JSON string). */
-  delta: string | null;
   /** v3+ editor content snapshot (TipTap JSON string). */
-  contentV2?: string | null;
+  contentV2: string | null;
 }
 
 export interface ChangelogSection {

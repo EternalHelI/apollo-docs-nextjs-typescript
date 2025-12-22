@@ -22,8 +22,8 @@ import { useThemeMode } from '@/lib/hooks/useTheme';
 import { useToast } from '@/lib/hooks/useToast';
 
 import type { DocMeta } from '@/lib/types';
-import { createDoc, ensureDocMeta, migrateLegacyIfNeeded, setDocTitle, touchDoc } from '@/lib/docsStore';
-import { loadContentV2Raw, loadDeltaRaw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
+import { createDoc, ensureDocMeta, setDocTitle, touchDoc } from '@/lib/docsStore';
+import { loadContentV2Raw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
 import { downloadBlob, escapeHtml, fmtTime, safeFilename } from '@/lib/utils';
 import { loadScriptOnce } from '@/lib/externalScripts';
 
@@ -36,30 +36,6 @@ function statusClass(tone: StatusTone): string {
     case 'err': return 'status status--err';
     default: return 'status';
   }
-}
-
-function deltaToPlainText(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as any;
-    const ops: any[] = Array.isArray(parsed?.ops) ? parsed.ops : [];
-    let out = '';
-    for (const op of ops) {
-      const ins = op?.insert;
-      if (typeof ins === 'string') out += ins;
-      else if (ins && typeof ins === 'object') out += '\n';
-    }
-    return out;
-  } catch {
-    return '';
-  }
-}
-
-function textToBasicHtml(text: string): string {
-  const clean = (text || '').replace(/\r\n?/g, '\n').trim();
-  if (!clean) return '<p></p>';
-  const paras = clean.split(/\n{2,}/g).map(p => p.trim()).filter(Boolean);
-  const toP = (p: string) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`;
-  return paras.map(toP).join('');
 }
 
 export default function EditorClient(props: { initialId?: string }) {
@@ -75,7 +51,6 @@ export default function EditorClient(props: { initialId?: string }) {
 
   const autosaveTimerRef = useRef<number | null>(null);
   const statusTimerRef = useRef<number | null>(null);
-  const dotsTimerRef = useRef<number | null>(null);
   const hydratedForDocRef = useRef<string | null>(null);
 
   const [doc, setDoc] = useState<DocMeta | null>(null);
@@ -100,14 +75,13 @@ export default function EditorClient(props: { initialId?: string }) {
     content: '<p></p>'
   });
 
-  // Resolve docId: migrate legacy single doc if needed, then ensure meta exists.
+  // Resolve docId: ensure metadata exists.
   useEffect(() => {
     if (!requestedId) return;
-    try { migrateLegacyIfNeeded(); } catch {}
-
     const meta = ensureDocMeta(requestedId);
     setDoc(meta);
     setTitle(meta.title || 'Apollo Document');
+    setStatus({ tone: 'neutral', text: 'Loading…' });
   }, [requestedId]);
 
   // If no id was provided, create a new doc and push.
@@ -115,6 +89,10 @@ export default function EditorClient(props: { initialId?: string }) {
     if (requestedId) return;
     try {
       const meta = createDoc('Apollo Document');
+      // Keep the editor usable even if the route doesn't remount immediately.
+      setDoc(meta);
+      setTitle(meta.title || 'Apollo Document');
+      setStatus({ tone: 'neutral', text: 'Loading…' });
       router.replace(`/editor?id=${encodeURIComponent(meta.id)}`);
     } catch {
       router.replace('/homepage');
@@ -139,24 +117,6 @@ export default function EditorClient(props: { initialId?: string }) {
     if (tone === 'ok') scheduleStatusReset();
   }, [scheduleStatusReset]);
 
-  const stopDots = useCallback(() => {
-    if (dotsTimerRef.current) {
-      window.clearTimeout(dotsTimerRef.current);
-      dotsTimerRef.current = null;
-    }
-  }, []);
-
-  const startDots = useCallback((base: string) => {
-    stopDots();
-    let i = 0;
-    const tick = () => {
-      i = (i + 1) % 4;
-      setStatus({ tone: 'neutral', text: base + '.'.repeat(i) });
-      dotsTimerRef.current = window.setTimeout(tick, 350);
-    };
-    tick();
-  }, [stopDots]);
-
   const computeWordCount = useCallback(() => {
     if (!editor) return;
     try {
@@ -169,10 +129,10 @@ export default function EditorClient(props: { initialId?: string }) {
     }
   }, [editor]);
 
-  const persist = useCallback((mode: 'auto' | 'manual' | 'load' = 'auto') => {
+  const persist = useCallback((mode: 'auto' | 'manual' = 'auto') => {
     if (!doc || !editor) return;
     try {
-      setStatusNow(mode === 'manual' ? 'Saving…' : (mode === 'load' ? 'Saving migrated…' : 'Autosaving…'), 'neutral');
+      setStatusNow(mode === 'manual' ? 'Saving…' : 'Autosaving…', 'neutral');
       const json = editor.getJSON();
       saveContentV2Raw(doc.id, JSON.stringify(json));
       try { touchDoc(doc.id); } catch {}
@@ -195,45 +155,31 @@ export default function EditorClient(props: { initialId?: string }) {
     if (!doc || !editor) return;
     if (hydratedForDocRef.current === doc.id) return;
     hydratedForDocRef.current = doc.id;
+    try {
+      setStatusNow('Loading…', 'neutral');
 
-    const run = () => {
-      try {
-        startDots('Loading editor');
-
-        // Prefer v2 content (TipTap JSON)
-        const rawV2 = loadContentV2Raw(doc.id);
-        if (rawV2) {
+      const rawV2 = loadContentV2Raw(doc.id);
+      if (rawV2) {
+        try {
           editor.commands.setContent(JSON.parse(rawV2));
-          stopDots();
-          setStatusNow('Ready.', 'neutral');
-          computeWordCount();
-          return;
+        } catch {
+          // Corrupted payload — recover to a blank document so the editor stays usable.
+          editor.commands.setContent('<p></p>');
+          setStatusNow('Recovered from corrupted content.', 'warn');
         }
-
-        // Fallback: legacy delta (Quill) -> best-effort text migration.
-        const legacyDelta = loadDeltaRaw(doc.id);
-        if (legacyDelta) {
-          const text = deltaToPlainText(legacyDelta);
-          editor.commands.setContent(textToBasicHtml(text), false);
-          stopDots();
-          setStatusNow('Migrated legacy content.', 'ok');
-          computeWordCount();
-          // Persist immediately so subsequent loads use the modern format.
-          window.setTimeout(() => persist('load'), 0);
-          return;
-        }
-
-        stopDots();
-        setStatusNow('Ready.', 'neutral');
-        computeWordCount();
-      } catch {
-        stopDots();
-        setStatusNow('Editor failed to load.', 'err');
+      } else {
+        // New document (or cleared storage)
+        editor.commands.setContent('<p></p>');
       }
-    };
 
-    run();
-  }, [computeWordCount, doc, editor, persist, setStatusNow, startDots, stopDots]);
+      computeWordCount();
+      // Ensure we never leave the status stuck on a loading string.
+      if (statusTimerRef.current) window.clearTimeout(statusTimerRef.current);
+      setStatusNow('Ready.', 'neutral');
+    } catch {
+      setStatusNow('Editor failed to load.', 'err');
+    }
+  }, [computeWordCount, doc, editor, setStatusNow]);
 
   // Autosave on user edits
   useEffect(() => {
@@ -358,10 +304,8 @@ export default function EditorClient(props: { initialId?: string }) {
 
   const exportPDF = useCallback(async () => {
     try {
-      startDots('Preparing PDF');
+      setStatusNow('Preparing PDF…', 'neutral');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js', () => (window as any).html2pdf);
-      stopDots();
-
       setStatusNow('Exporting PDF…', 'warn');
       const filename = safeFilename(title, 'pdf');
       await (window as any).html2pdf().set({
@@ -374,33 +318,27 @@ export default function EditorClient(props: { initialId?: string }) {
 
       setStatusNow(`PDF exported @ ${fmtTime(Date.now())}`, 'ok');
     } catch {
-      stopDots();
       setStatusNow('PDF export failed.', 'err');
     }
-  }, [getPrintableContainer, setStatusNow, startDots, stopDots, title]);
+  }, [getPrintableContainer, setStatusNow, title]);
 
   const exportDOCX = useCallback(async () => {
     try {
-      startDots('Preparing DOCX');
+      setStatusNow('Preparing DOCX…', 'neutral');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js', () => (window as any).htmlDocx);
-      stopDots();
-
       const htmlBody = getEditorHtml();
       const docHtml = `<!doctype html><html><head><meta charset="utf-8"></head><body>${htmlBody}</body></html>`;
       downloadBlob((window as any).htmlDocx.asBlob(docHtml), safeFilename(title, 'docx'));
       setStatusNow(`DOCX exported @ ${fmtTime(Date.now())}`, 'ok');
     } catch {
-      stopDots();
       setStatusNow('DOCX export failed.', 'err');
     }
-  }, [getEditorHtml, setStatusNow, startDots, stopDots, title]);
+  }, [getEditorHtml, setStatusNow, title]);
 
   const exportODT = useCallback(async () => {
     try {
-      startDots('Preparing ODT');
+      setStatusNow('Preparing ODT…', 'neutral');
       await loadScriptOnce('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', () => (window as any).JSZip);
-      stopDots();
-
       const text = getEditorText();
       const paras = text.split('\n').map(t => t.trim()).filter(Boolean);
       const escapeXml = (s: string) => s
@@ -429,10 +367,9 @@ export default function EditorClient(props: { initialId?: string }) {
       downloadBlob(blob, safeFilename(title, 'odt'));
       setStatusNow(`ODT exported @ ${fmtTime(Date.now())}`, 'ok');
     } catch {
-      stopDots();
       setStatusNow('ODT export failed.', 'err');
     }
-  }, [getEditorText, setStatusNow, startDots, stopDots, title]);
+  }, [getEditorText, setStatusNow, title]);
 
   const onPrint = useCallback(async () => {
     try {
