@@ -17,6 +17,36 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.4',
+  date: '2025-12-22',
+  time: '3:25 PM PST',
+  title: 'Editor bar: full-width layout + Loading status fix',
+  summary: 'Updated the editor document bar to behave like a second, full-width navbar and hardened the initial hydration path so the status pill no longer gets stuck on Loading.',
+  sections: [
+    {
+      title: 'Editor header',
+      items: [
+        'Made the document bar full-width and aligned it directly under the primary navbar.',
+        'Added visible labels for Document Name and Heading, while keeping screen-reader labels for accessibility.',
+        'Improved Heading dropdown readability in dark mode by setting appropriate native color-scheme defaults.'
+      ]
+    },
+    {
+      title: 'Save status reliability',
+      items: [
+        'Fixed a state hydration gap that could leave the status pill stuck on Loading when creating a new document.',
+        'Added a small safety fallback to transition to Ready if hydration is interrupted.'
+      ]
+    },
+    {
+      title: 'New documents',
+      items: [
+        'Seed new documents with the standard introductory content at creation time so every new document opens with helpful starter text.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.3',
   date: '2025-12-22',
   time: '2:57 PM PST',

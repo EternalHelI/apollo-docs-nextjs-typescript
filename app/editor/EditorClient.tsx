@@ -22,7 +22,7 @@ import { useThemeMode } from '@/lib/hooks/useTheme';
 import { useToast } from '@/lib/hooks/useToast';
 
 import type { DocMeta } from '@/lib/types';
-import { createDoc, ensureDocMeta, setDocTitle, touchDoc } from '@/lib/docsStore';
+import { DEFAULT_DOC_CONTENT_V2_RAW, createDoc, ensureDocMeta, setDocTitle, touchDoc } from '@/lib/docsStore';
 import { loadContentV2Raw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
 import { downloadBlob, escapeHtml, safeFilename } from '@/lib/utils';
 import { loadScriptOnce } from '@/lib/externalScripts';
@@ -74,7 +74,7 @@ export default function EditorClient(props: { initialId?: string }) {
   const toast = useToast();
 
   const autosaveTimerRef = useRef<number | null>(null);
-  const hydratedForDocRef = useRef<string | null>(null);
+  const hydratedForDocRef = useRef<{ docId: string; editor: unknown } | null>(null);
 
   const [doc, setDoc] = useState<DocMeta | null>(null);
   const [title, setTitle] = useState('Apollo Document');
@@ -149,6 +149,9 @@ export default function EditorClient(props: { initialId?: string }) {
     if (requestedId) return;
     try {
       const meta = createDoc('Apollo Document');
+      // Don't rely on a navigation refresh to hydrate state; set local state immediately.
+      setDoc(meta);
+      setTitle(meta.title || 'Apollo Document');
       router.replace(`/editor?id=${encodeURIComponent(meta.id)}`);
     } catch {
       router.replace('/homepage');
@@ -208,8 +211,8 @@ export default function EditorClient(props: { initialId?: string }) {
   // Load content for this doc.
   useEffect(() => {
     if (!doc || !editor) return;
-    if (hydratedForDocRef.current === doc.id) return;
-    hydratedForDocRef.current = doc.id;
+    if (hydratedForDocRef.current?.docId === doc.id && hydratedForDocRef.current.editor === editor) return;
+    hydratedForDocRef.current = { docId: doc.id, editor };
 
     const run = () => {
       try {
@@ -219,8 +222,14 @@ export default function EditorClient(props: { initialId?: string }) {
         if (rawV2) {
           editor.commands.setContent(JSON.parse(rawV2));
         } else {
-          // No snapshot yet: start with an empty paragraph.
-          editor.commands.setContent(textToBasicHtml(''), false);
+          // No snapshot yet: seed with the standard intro message.
+          editor.commands.setContent(JSON.parse(DEFAULT_DOC_CONTENT_V2_RAW));
+          try {
+            saveContentV2Raw(doc.id, DEFAULT_DOC_CONTENT_V2_RAW);
+            try { touchDoc(doc.id); } catch {}
+          } catch {
+            // ignore
+          }
         }
 
         setReady();
@@ -232,6 +241,21 @@ export default function EditorClient(props: { initialId?: string }) {
 
     run();
   }, [computeWordCount, doc, editor, setError, setReady, setWorking]);
+
+  // Safety net: if anything interrupts the initial hydration, avoid leaving the
+  // status pill stuck on "Loading...".
+  useEffect(() => {
+    if (!doc || !editor) return;
+    const t = window.setTimeout(() => {
+      setStatus((s) => {
+        if (s.mode === 'loading' || s.mode === 'working') {
+          return { mode: 'ready', tone: 'neutral', base: 'Ready' };
+        }
+        return s;
+      });
+    }, 2200);
+    return () => window.clearTimeout(t);
+  }, [doc, editor]);
 
   // Autosave on user edits
   useEffect(() => {
@@ -553,10 +577,12 @@ export default function EditorClient(props: { initialId?: string }) {
         </div>
       </header>
 
-      <main className="container editor-wrap" id="main">
-        <div className="docbar" id="docbar">
-          <div className="docbar-inner docbar-inner--editor">
+      <main className="editor-wrap" id="main">
+        <div className="docbar docbar--nav" id="docbar">
+          <div className="docbar-surface">
+            <div className="docbar-inner docbar-inner--editor">
             <div className="docbar-left">
+              <span aria-hidden="true" className="docbar-kicker">Document Name</span>
               <label className="sr-only" htmlFor="docTitle">Document Name</label>
               <input
                 autoComplete="off"
@@ -573,6 +599,7 @@ export default function EditorClient(props: { initialId?: string }) {
             <div className="docbar-mid" aria-label="Document settings">
               <div aria-label="Editor toolbar" className="tt-toolbar tt-toolbar--inline" id="toolbar" role="toolbar">
                 <span className="tt-group">
+                  <span aria-hidden="true" className="docbar-kicker">Heading</span>
                   <label className="sr-only" htmlFor="ttHeading">Heading</label>
                   <select aria-label="Heading" id="ttHeading" value={headingValue} onChange={(e) => setHeading(e.target.value)} disabled={!editor}>
                     <option value="">Normal</option>
@@ -676,14 +703,17 @@ export default function EditorClient(props: { initialId?: string }) {
                 </div>
               </div>
             </nav>
+            </div>
           </div>
         </div>
 
-        <section className="panel panel--editor">
-          <EditorContent editor={editor} />
-        </section>
+        <div className="container editor-body">
+          <section className="panel panel--editor">
+            <EditorContent editor={editor} />
+          </section>
 
-        <ToastHost toastRef={toast.refs.toastRef} textRef={toast.refs.textRef} timerRef={toast.refs.timerRef} variant="danger" />
+          <ToastHost toastRef={toast.refs.toastRef} textRef={toast.refs.textRef} timerRef={toast.refs.timerRef} variant="danger" />
+        </div>
       </main>
 
       <SiteFooter />

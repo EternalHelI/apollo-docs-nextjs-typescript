@@ -1,6 +1,54 @@
 import type { DocMeta, TrashItem } from '@/lib/types';
-import { getContentKeyV2, loadContentV2Raw, loadIndex, loadTrash, removeContentV2, saveIndex, saveTrash } from '@/lib/storage';
+import {
+  getContentKeyV2,
+  loadContentV2Raw,
+  loadIndex,
+  loadTrash,
+  removeContentV2,
+  saveContentV2Raw,
+  saveIndex,
+  saveTrash
+} from '@/lib/storage';
 import { generateId } from '@/lib/utils';
+
+// Default content for brand-new documents (TipTap JSON).
+// Keep this simple and StarterKit-compatible.
+export const DEFAULT_DOC_CONTENT_V2 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'heading',
+      attrs: { level: 1 },
+      content: [{ type: 'text', text: 'Welcome to Apollo Documents' }]
+    },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'This is a new document. Start typing below — Apollo will autosave as you work.' }
+      ]
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Use the toolbar for headings and formatting.' }] }]
+        },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Press Ctrl/Cmd+S to force a manual snapshot.' }] }]
+        },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Options → Save As exports JSON / PDF / DOCX / ODT.' }] }]
+        }
+      ]
+    },
+    { type: 'paragraph', content: [{ type: 'text', text: '' }] }
+  ]
+} as const;
+
+export const DEFAULT_DOC_CONTENT_V2_RAW = JSON.stringify(DEFAULT_DOC_CONTENT_V2);
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -22,6 +70,15 @@ export function createDoc(title = 'Apollo Document'): DocMeta {
   const doc: DocMeta = { id, title, createdAt: Date.now(), updatedAt: Date.now() };
   idx.push(doc);
   saveIndex(idx);
+
+  // Seed brand-new documents with an introductory message.
+  // This keeps the first open consistent across Home → New and direct /editor.
+  try {
+    saveContentV2Raw(id, DEFAULT_DOC_CONTENT_V2_RAW);
+  } catch {
+    // ignore (private mode / storage disabled)
+  }
+
   return doc;
 }
 
