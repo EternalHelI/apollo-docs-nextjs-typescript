@@ -17,6 +17,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v2.0.1',
+  date: '2025-12-21',
+  time: '9:30 PM PST',
+  title: 'Build fixes: missing exports + strict TS refs',
+  summary: 'Resolved Next.js/Vercel build failures by restoring expected exports and correcting strict TypeScript ref typings.',
+  sections: [
+    {
+      title: 'Build & TypeScript',
+      items: [
+        'Added backward-compatible word count preference exports (loadWordCountEnabled/storeWordCountEnabled).',
+        'Added touchDoc export to docs store to match editor imports.',
+        'Relaxed ToastHost ref prop typing to accept nullable refs (RefObject<HTMLDivElement | null>) for strictNullChecks compatibility.'
+      ]
+    }
+  ]
+},
+{
   version: 'v2.0.0',
   date: '2025-12-21',
   time: '7:15 PM PST',
@@ -565,6 +582,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.8.2',
       date: '2025-12-20',
+      time: '—',
       title: 'Local icons for Home and Options',
       summary: 'Bundled the Home and Options icons locally to avoid external requests and ensure the house/gear render consistently on GitHub Pages.',
       sections: [
@@ -581,6 +599,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.8.1',
       date: '2025-12-20',
+      time: '—',
       title: 'Changelog timeline + Home navigation + Archive modal fixes',
       summary: 'Reworked the changelog page into a compact version list with a “Read more” modal; added Home button with icon across pages; fixed menu hover and Archive delete modal reliability.',
       sections: [
@@ -617,6 +636,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.7.0',
       date: '2025-12-20',
+      time: '—',
       title: 'Archive confirmation modal + initial changelog page',
       summary: 'Replaced browser confirm prompts with a styled modal and introduced changelogs.html for tracking versions.',
       sections: [
@@ -627,6 +647,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.6.4',
       date: '2025-12-20',
+      time: '—',
       title: 'Options button icon adjustments',
       summary: 'Options icon refinement and layout stabilization.',
       sections: [{ title: 'UI', items: ['Options icon/label stabilization.'] }]
@@ -634,6 +655,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.6.3',
       date: '2025-12-20',
+      time: '—',
       title: 'Quill toolbar icon sizing restoration',
       summary: 'Restored Quill toolbar icon sizing (alignment controls) and improved Options reliability.',
       sections: [{ title: 'Editor', items: ['Restored Quill toolbar icon sizing to prevent tiny/missing alignment icons.'] }]
@@ -641,6 +663,7 @@ export const CHANGELOGS: ChangelogEntry[] = [
     {
       version: 'v1.6.1',
       date: '2025-12-20',
+      time: '—',
       title: 'Header link styling fixes',
       summary: 'Removed unwanted underlines and cleaned up header button presentation.',
       sections: [{ title: 'Index', items: ['Removed underline styling from buttons/links in the header.'] }]
@@ -693,10 +716,15 @@ export const CHANGELOGS: ChangelogEntry[] = [
   time: '10:05 AM PST',
   title: 'Fix: Quill toolbar picker spacing and borders',
   summary: 'Removed unintended borders on Quill dropdown controls and improved spacing/padding so the toolbar matches the rest of the UI.',
-  changes: [
-    'Removed borders on Heading/Text Size/Alignment picker labels.',
-    'Added consistent padding and chevron spacing so dropdown labels do not crowd text.',
-    'Improved alignment dropdown icon sizing and centering.',
-  ],
+  sections: [
+    {
+      title: 'Bugfix',
+      items: [
+        'Removed borders on Heading/Text Size/Alignment picker labels.',
+        'Added consistent padding and chevron spacing so dropdown labels do not crowd text.',
+        'Improved alignment dropdown icon sizing and centering.'
+      ]
+    }
+  ]
 },
 ];

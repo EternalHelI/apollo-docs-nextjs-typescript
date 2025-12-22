@@ -1,9 +1,9 @@
 import type { RefObject } from 'react';
 
 export function ToastHost(props: {
-  toastRef: RefObject<HTMLDivElement>;
-  textRef: RefObject<HTMLDivElement>;
-  timerRef: RefObject<HTMLDivElement>;
+  toastRef: RefObject<HTMLDivElement | null>;
+  textRef: RefObject<HTMLDivElement | null>;
+  timerRef: RefObject<HTMLDivElement | null>;
   variant?: 'danger' | 'neutral';
 }) {
   const variantClass = props.variant === 'neutral' ? 'toast' : 'toast toast-danger';

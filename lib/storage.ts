@@ -125,6 +125,15 @@ export function storeWordCountPref(on: boolean): void {
   try { window.localStorage.setItem(storageKeys.wordcount, on ? '1' : '0'); } catch {}
 }
 
+// Backward-compat aliases (older pages/imports)
+export function loadWordCountEnabled(): boolean {
+  return loadWordCountPref();
+}
+
+export function storeWordCountEnabled(on: boolean): void {
+  storeWordCountPref(on);
+}
+
 export function loadDeltaRaw(docId: string): string | null {
   if (!isBrowser()) return null;
   try { return window.localStorage.getItem(getContentKey(docId)); } catch { return null; }

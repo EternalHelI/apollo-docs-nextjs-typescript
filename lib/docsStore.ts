@@ -37,6 +37,19 @@ export function updateDocMeta(docId: string, patch: Partial<Omit<DocMeta, 'id' |
   saveIndex(idx);
 }
 
+export function touchDoc(docId: string): void {
+  const idx = loadIndex();
+  const doc = idx.find(d => d.id === docId);
+  if (doc) {
+    doc.updatedAt = Date.now();
+    saveIndex(idx);
+    return;
+  }
+
+  // If the document does not exist yet, create minimal metadata so future saves are consistent.
+  ensureDocMeta(docId, 'Apollo Document');
+}
+
 export function setDocTitle(docId: string, title: string): boolean {
   const next = (title || '').trim();
   if (!next) return false;
