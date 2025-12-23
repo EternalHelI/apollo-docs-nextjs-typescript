@@ -17,6 +17,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.6',
+  date: '2025-12-22',
+  time: '7:37 PM PST',
+  title: 'Fix: welcome content reliability + hydration autosave guard',
+  summary: 'Hardened editor hydration so the intro content reliably appears for new/empty documents, and prevented early hydration updates from overwriting content or confusing the save-status pill.',
+  sections: [
+    {
+      title: 'Editor',
+      items: [
+        'Ignored TipTap update events during initial hydration to prevent an early empty autosave from overwriting seeded content.',
+        'Added a durable per-document “user started” marker so intro injection only happens for docs that have never been edited.',
+        'If a document snapshot is missing, corrupted, or still effectively empty, the editor now seeds and persists the intro content immediately.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.5',
   date: '2025-12-22',
   time: '3:52 PM PST',

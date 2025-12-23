@@ -126,6 +126,12 @@ export default function EditorClient(props: { initialId?: string }) {
 
   const autosaveTimerRef = useRef<number | null>(null);
   const hydratedForDocRef = useRef<{ docId: string; editor: unknown } | null>(null);
+  const hydratingRef = useRef(false);
+  const userStartedRef = useRef(false);
+
+  const getUserStartedKeyV1 = useCallback((docId: string) => {
+    return `apollo_docs_doc_${docId}_has_user_content_v1`;
+  }, []);
 
   const [doc, setDoc] = useState<DocMeta | null>(null);
   const [title, setTitle] = useState('Apollo Document');
@@ -268,12 +274,33 @@ export default function EditorClient(props: { initialId?: string }) {
     const run = () => {
       try {
         setWorking('Loading');
+        hydratingRef.current = true;
+
+        // Read the "user started" flag once for this doc. If the user has ever
+        // typed meaningful content, we should not auto-inject the intro again
+        // even if they later clear the document.
+        try {
+          userStartedRef.current = window.localStorage.getItem(getUserStartedKeyV1(doc.id)) === '1';
+        } catch {
+          userStartedRef.current = false;
+        }
 
         const rawV2 = loadContentV2Raw(doc.id);
+        // Load persisted TipTap JSON. If corrupted/unparseable, fall back to the default
+        // template instead of leaving the editor empty.
+        let loaded: any = null;
         if (rawV2) {
-          editor.commands.setContent(JSON.parse(rawV2));
+          try {
+            loaded = JSON.parse(rawV2);
+          } catch {
+            loaded = null;
+          }
+        }
+
+        if (loaded) {
+          editor.commands.setContent(loaded);
         } else {
-          // No snapshot yet: seed with the standard intro message.
+          // No snapshot yet (or invalid snapshot): seed with the intro template.
           editor.commands.setContent(JSON.parse(DEFAULT_DOC_CONTENT_V2_RAW));
           try {
             saveContentV2Raw(doc.id, DEFAULT_DOC_CONTENT_V2_RAW);
@@ -283,25 +310,15 @@ export default function EditorClient(props: { initialId?: string }) {
           }
         }
 
-        // Ensure new documents actually display a welcome message.
-        // If the current document is effectively empty, inject intro content using
-        // TipTap's insertContent command (as recommended by their API docs).
-        // This avoids edge cases where an early empty autosave can overwrite seeded content.
+        // Ensure documents that are still effectively empty display a welcome message.
+        // We intentionally *do not* gate this on the older "intro seeded" flag because
+        // earlier builds could set that flag even when no intro was inserted.
         try {
-          let introSeeded = false;
-          try {
-            introSeeded = window.localStorage.getItem(getIntroSeedKeyV1(doc.id)) === '1';
-          } catch {
-            introSeeded = false;
-          }
-
           const current = editor.getJSON();
-          if (!introSeeded && isEffectivelyEmptyDoc(current)) {
-            try {
-              editor.commands.clearContent(true);
-            } catch {
-              // ignore
-            }
+          const hasUserContent = userStartedRef.current;
+
+          if (!hasUserContent && isEffectivelyEmptyDoc(current)) {
+            try { editor.commands.clearContent(true); } catch {}
             editor.commands.insertContent(INTRO_INSERT_NODES as any);
 
             // Persist immediately so refresh/back-forward doesn't drop the intro.
@@ -311,10 +328,10 @@ export default function EditorClient(props: { initialId?: string }) {
             } catch {
               // ignore
             }
-          }
 
-          // Mark seeded to avoid re-injecting if the user later clears the doc intentionally.
-          try { window.localStorage.setItem(getIntroSeedKeyV1(doc.id), '1'); } catch {}
+            // Record that we've inserted the intro at least once.
+            try { window.localStorage.setItem(getIntroSeedKeyV1(doc.id), '1'); } catch {}
+          }
         } catch {
           // ignore
         }
@@ -323,11 +340,15 @@ export default function EditorClient(props: { initialId?: string }) {
         computeWordCount();
       } catch {
         setError('Editor failed to load');
+      } finally {
+        // Avoid treating the initial setContent as a user edit.
+        // TipTap can fire multiple update events during content hydration.
+        window.setTimeout(() => { hydratingRef.current = false; }, 180);
       }
     };
 
     run();
-  }, [computeWordCount, doc, editor, setError, setReady, setWorking]);
+  }, [computeWordCount, doc, editor, getUserStartedKeyV1, setError, setReady, setWorking]);
 
   // Safety net: if anything interrupts the initial hydration, avoid leaving the
   // status pill stuck on "Loading...".
@@ -349,6 +370,16 @@ export default function EditorClient(props: { initialId?: string }) {
     if (!editor) return;
 
     const handler = () => {
+      // Ignore editor changes caused by hydration (setContent / insertContent).
+      if (hydratingRef.current) return;
+
+      // First real user edit: record a durable marker so we don't ever
+      // auto-inject the intro for this document again.
+      if (doc && !userStartedRef.current) {
+        userStartedRef.current = true;
+        try { window.localStorage.setItem(getUserStartedKeyV1(doc.id), '1'); } catch {}
+      }
+
       if (wordCountEnabled) {
         const idle = (window as any).requestIdleCallback as ((cb: () => void) => void) | undefined;
         if (typeof idle === 'function') idle(() => computeWordCount()); else computeWordCount();
@@ -362,7 +393,7 @@ export default function EditorClient(props: { initialId?: string }) {
     return () => {
       try { editor.off('update', handler); } catch {}
     };
-  }, [computeWordCount, editor, scheduleAutosave, setAutosaving, wordCountEnabled]);
+  }, [computeWordCount, doc, editor, getUserStartedKeyV1, scheduleAutosave, setAutosaving, wordCountEnabled]);
 
   // Ctrl/Cmd+S manual save
   useEffect(() => {
