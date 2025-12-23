@@ -23,7 +23,7 @@ import { useToast } from '@/lib/hooks/useToast';
 
 import type { DocMeta } from '@/lib/types';
 import { DEFAULT_DOC_CONTENT_V2_RAW, createDoc, ensureDocMeta, setDocTitle, touchDoc } from '@/lib/docsStore';
-import { loadContentV2Raw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
+import { getIntroSeedKeyV1, loadContentV2Raw, loadWordCountEnabled, saveContentV2Raw, storeWordCountEnabled } from '@/lib/storage';
 import { downloadBlob, escapeHtml, safeFilename } from '@/lib/utils';
 import { loadScriptOnce } from '@/lib/externalScripts';
 
@@ -61,6 +61,57 @@ function textToBasicHtml(text: string): string {
   const toP = (p: string) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`;
   return paras.map(toP).join('');
 }
+
+// TipTap/ProseMirror empty documents typically look like:
+// { type:'doc', content:[{ type:'paragraph' }] } (or with an empty text node).
+function isEffectivelyEmptyDoc(json: any): boolean {
+  try {
+    const c = json?.content;
+    if (!Array.isArray(c)) return true;
+    if (c.length === 0) return true;
+    if (c.length === 1 && c[0]?.type === 'paragraph') {
+      const pc = c[0]?.content;
+      if (!Array.isArray(pc) || pc.length === 0) return true;
+      if (pc.length === 1 && pc[0]?.type === 'text' && String(pc[0]?.text ?? '').trim() === '') return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+// Intro content for brand-new documents.
+// We intentionally use insertContent (nodes array) to match TipTap docs and to avoid
+// edge cases where setContent can be overridden by early autosave flows.
+const INTRO_INSERT_NODES = [
+  {
+    type: 'heading',
+    attrs: { level: 1 },
+    content: [{ type: 'text', text: 'Welcome to Apollo Documents' }]
+  },
+  {
+    type: 'paragraph',
+    content: [{ type: 'text', text: 'This is a new document. Start typing below — Apollo will autosave as you work.' }]
+  },
+  {
+    type: 'bulletList',
+    content: [
+      {
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Use the toolbar for headings and formatting.' }] }]
+      },
+      {
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Press Ctrl/Cmd+S to force a manual snapshot.' }] }]
+      },
+      {
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Options → Save As exports JSON / PDF / DOCX / ODT.' }] }]
+      }
+    ]
+  },
+  { type: 'paragraph', content: [{ type: 'text', text: '' }] }
+] as const;
 
 export default function EditorClient(props: { initialId?: string }) {
   usePageLoader();
@@ -228,8 +279,44 @@ export default function EditorClient(props: { initialId?: string }) {
             saveContentV2Raw(doc.id, DEFAULT_DOC_CONTENT_V2_RAW);
             try { touchDoc(doc.id); } catch {}
           } catch {
-            // ignore
+            // ignore (private mode / storage disabled)
           }
+        }
+
+        // Ensure new documents actually display a welcome message.
+        // If the current document is effectively empty, inject intro content using
+        // TipTap's insertContent command (as recommended by their API docs).
+        // This avoids edge cases where an early empty autosave can overwrite seeded content.
+        try {
+          let introSeeded = false;
+          try {
+            introSeeded = window.localStorage.getItem(getIntroSeedKeyV1(doc.id)) === '1';
+          } catch {
+            introSeeded = false;
+          }
+
+          const current = editor.getJSON();
+          if (!introSeeded && isEffectivelyEmptyDoc(current)) {
+            try {
+              editor.commands.clearContent(true);
+            } catch {
+              // ignore
+            }
+            editor.commands.insertContent(INTRO_INSERT_NODES as any);
+
+            // Persist immediately so refresh/back-forward doesn't drop the intro.
+            try {
+              saveContentV2Raw(doc.id, JSON.stringify(editor.getJSON()));
+              try { touchDoc(doc.id); } catch {}
+            } catch {
+              // ignore
+            }
+          }
+
+          // Mark seeded to avoid re-injecting if the user later clears the doc intentionally.
+          try { window.localStorage.setItem(getIntroSeedKeyV1(doc.id), '1'); } catch {}
+        } catch {
+          // ignore
         }
 
         setReady();

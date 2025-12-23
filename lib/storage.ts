@@ -16,6 +16,11 @@ export function getContentKeyV2(id: string): string {
   return `apollo_docs_doc_${id}_content_v2`;
 }
 
+// Used to ensure the "new document" intro is only injected once per doc.
+export function getIntroSeedKeyV1(id: string): string {
+  return `apollo_docs_doc_${id}_intro_seeded_v1`;
+}
+
 // Backward-compatible alias used throughout the codebase.
 export function getContentKey(id: string): string {
   return getContentKeyV2(id);

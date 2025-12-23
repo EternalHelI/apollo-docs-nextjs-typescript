@@ -17,6 +17,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.5',
+  date: '2025-12-22',
+  time: '3:52 PM PST',
+  title: 'New documents: guaranteed welcome content injection',
+  summary: 'Ensured every brand-new (or effectively empty) document displays the introductory content by injecting it with TipTap insertContent and persisting immediately.',
+  sections: [
+    {
+      title: 'Editor',
+      items: [
+        'Added a one-time intro injection path for empty docs using TipTap insertContent (nodes array) to avoid edge cases where an early empty snapshot can overwrite the seeded template.',
+        'Introduced a per-document intro seed flag (localStorage) so the welcome content is only injected once and won\'t reappear if a user later clears a document intentionally.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.4',
   date: '2025-12-22',
   time: '3:25 PM PST',
