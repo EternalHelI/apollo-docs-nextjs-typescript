@@ -45,14 +45,20 @@ export default function Homepage() {
     reload();
   }, [reload]);
 
+  const markPendingOpen = useCallback((id: string) => {
+    try { window.sessionStorage.setItem('apollo_docs_pending_open_id_v1', id); } catch {}
+  }, []);
+
   const onCreate = useCallback(() => {
     const meta = createDoc('Apollo Document');
+    markPendingOpen(meta.id);
     router.push(openDocUrl(meta.id));
-  }, [router]);
+  }, [markPendingOpen, router]);
 
   const onOpen = useCallback((id: string) => {
+    markPendingOpen(id);
     router.push(openDocUrl(id));
-  }, [router]);
+  }, [markPendingOpen, router]);
 
   const onArchive = useCallback((id: string) => {
     const doc = docs.find(d => d.id === id);

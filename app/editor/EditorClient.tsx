@@ -119,7 +119,44 @@ export default function EditorClient(props: { initialId?: string }) {
   usePrivateModeWarning();
 
   const router = useRouter();
-  const requestedId = (typeof props.initialId === 'string' && props.initialId.trim()) ? props.initialId : null;
+  const PENDING_OPEN_ID_KEY = 'apollo_docs_pending_open_id_v1';
+
+  const readIdFromUrl = useCallback((): string | null => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const id = (sp.get('id') || '').trim();
+      return id ? id : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const readPendingOpenId = useCallback((): string | null => {
+    try {
+      const v = (window.sessionStorage.getItem(PENDING_OPEN_ID_KEY) || '').trim();
+      return v ? v : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const clearPendingOpenId = useCallback(() => {
+    try { window.sessionStorage.removeItem(PENDING_OPEN_ID_KEY); } catch {}
+  }, []);
+
+  const initialFromProps = (typeof props.initialId === 'string' && props.initialId.trim()) ? props.initialId.trim() : null;
+  // Initialize from the most reliable sources available on the client.
+  // This prevents accidental duplicate doc creation during client navigation when
+  // props.initialId can briefly be undefined.
+  const [effectiveId, setEffectiveId] = useState<string | null>(() => {
+    if (initialFromProps) return initialFromProps;
+    const fromUrl = readIdFromUrl();
+    if (fromUrl) return fromUrl;
+    const pending = readPendingOpenId();
+    return pending || null;
+  });
+
+  const autoCreateStartedRef = useRef(false);
 
   const { isDark, toggleTheme, toggleLabel: themeLabel } = useThemeMode();
   const toast = useToast();
@@ -193,27 +230,64 @@ export default function EditorClient(props: { initialId?: string }) {
   const setMessage = useCallback((base: string, tone: StatusTone = 'neutral') => setStatus({ mode: 'message', tone, base }), []);
   const setError = useCallback((base: string) => setStatus({ mode: 'error', tone: 'err', base }), []);
 
+  // Keep in sync if Next.js provides initialId after a client navigation.
+  useEffect(() => {
+    if (!initialFromProps) return;
+    setEffectiveId((cur) => (cur === initialFromProps ? cur : initialFromProps));
+  }, [initialFromProps]);
+
   // Resolve doc meta.
   useEffect(() => {
-    if (!requestedId) return;
-    const meta = ensureDocMeta(requestedId);
+    if (!effectiveId) return;
+    const meta = ensureDocMeta(effectiveId);
     setDoc(meta);
     setTitle(meta.title || 'Apollo Document');
-  }, [requestedId]);
+  }, [effectiveId]);
 
-  // If no id was provided, create a new doc and push.
+  // If no id is available, create a new doc. This path is deliberately conservative:
+  // we re-check the URL and a session "pending open" marker before creating to avoid
+  // duplicate documents during navigation edge cases.
   useEffect(() => {
-    if (requestedId) return;
-    try {
-      const meta = createDoc('Apollo Document');
-      // Don't rely on a navigation refresh to hydrate state; set local state immediately.
-      setDoc(meta);
-      setTitle(meta.title || 'Apollo Document');
-      router.replace(`/editor?id=${encodeURIComponent(meta.id)}`);
-    } catch {
-      router.replace('/homepage');
+    if (effectiveId) {
+      clearPendingOpenId();
+      return;
     }
-  }, [requestedId, router]);
+
+    if (autoCreateStartedRef.current) return;
+    autoCreateStartedRef.current = true;
+
+    const t = window.setTimeout(() => {
+      const fromUrl = readIdFromUrl();
+      if (fromUrl) {
+        setEffectiveId(fromUrl);
+        autoCreateStartedRef.current = false;
+        clearPendingOpenId();
+        return;
+      }
+
+      const pending = readPendingOpenId();
+      if (pending) {
+        setEffectiveId(pending);
+        router.replace(`/editor?id=${encodeURIComponent(pending)}`);
+        autoCreateStartedRef.current = false;
+        clearPendingOpenId();
+        return;
+      }
+
+      try {
+        const meta = createDoc('Apollo Document');
+        setDoc(meta);
+        setTitle(meta.title || 'Apollo Document');
+        setEffectiveId(meta.id);
+        router.replace(`/editor?id=${encodeURIComponent(meta.id)}`);
+        clearPendingOpenId();
+      } catch {
+        router.replace('/homepage');
+      }
+    }, 0);
+
+    return () => window.clearTimeout(t);
+  }, [clearPendingOpenId, effectiveId, readIdFromUrl, readPendingOpenId, router]);
 
   // Word count preference.
   useEffect(() => {

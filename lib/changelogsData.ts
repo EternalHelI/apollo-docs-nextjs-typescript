@@ -17,6 +17,43 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
 {
+  version: 'v3.1.8',
+  date: '2025-12-22',
+  time: '8:44 PM PST',
+  title: 'Fix: stop duplicate documents on Create/Open',
+  summary: 'Eliminated duplicate document creation by carrying the intended document id through navigation and preventing the editor from falling back to auto-create during edge-case client transitions.',
+  sections: [
+    {
+      title: 'Homepage',
+      items: [
+        'When creating or opening a document, the app now writes a short-lived session marker (apollo_docs_pending_open_id_v1) so the editor can recover the correct id even if search params are briefly unavailable.'
+      ]
+    },
+    {
+      title: 'Editor',
+      items: [
+        'If the editor cannot immediately read ?id=..., it now prefers the pending-open marker before creating a new document, preventing accidental duplicates.'
+      ]
+    }
+  ]
+},
+{
+  version: 'v3.1.7',
+  date: '2025-12-22',
+  time: '8:12 PM PST',
+  title: 'Fix: duplicate document creation from New Document',
+  summary: 'Prevented duplicate documents when clicking Create on the homepage by ensuring the editor does not auto-create a new document if the URL already contains an id during client navigation.',
+  sections: [
+    {
+      title: 'Homepage → Editor navigation',
+      items: [
+        'Hardened EditorClient id resolution: when initialId is temporarily missing, the editor now reads ?id=... directly from window.location before deciding to auto-create a new document.',
+        'Delayed the auto-create path until after the URL has been checked, eliminating the double-create scenario.'
+      ]
+    }
+  ]
+},
+{
   version: 'v3.1.6',
   date: '2025-12-22',
   time: '7:37 PM PST',
